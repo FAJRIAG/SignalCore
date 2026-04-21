@@ -1,24 +1,24 @@
 # SignalCore
 
-SignalCore is an enterprise-scale, high-performance web-based video conferencing platform. It is designed to host 100+ concurrent users per room with sub-300ms latency, utilizing a Selective Forwarding Unit (SFU) architecture.
+SignalCore adalah platform video conferencing berbasis web skala enterprise dengan performa tinggi. Dirancang untuk menampung lebih dari 100 pengguna konkuren dalam satu ruangan dengan latensi di bawah 300ms, menggunakan arsitektur Selective Forwarding Unit (SFU).
 
-## 🚀 Key Features
+## 🚀 Fitur Utama
 
-- **Enterprise Scalability**: Supports >100 users per room.
-- **Low Latency**: Sub-300ms glass-to-glass latency.
-- **Adaptive Grid**: Dynamically prioritizes active speakers and adjusts layout based on participant count.
-- **Intelligent Bandwidth Management**: Uses 3-layer Simulcast and Selective Forwarding to optimize performance.
-- **Self-Hosted SFU**: Powered by **mediasoup** for raw media performance.
-- **Robust Orchestration**: Managed by **Laravel** for signaling, authentication (JWT), and room lifecycle.
+- **Skalabilitas Enterprise**: Mendukung 100+ pengguna per ruangan.
+- **Latensi Rendah**: Latensi glass-to-glass di bawah 300ms.
+- **Grid Adaptif**: Secara dinamis memprioritaskan pembicara aktif dan menyesuaikan tata letak berdasarkan jumlah peserta.
+- **Manajemen Bandwidth Cerdas**: Menggunakan Simulcast 3-lapis dan Selective Forwarding untuk mengoptimalkan performa.
+- **SFU Self-Hosted**: Ditenagai oleh **mediasoup** untuk performa media mentah yang maksimal.
+- **Orkestrasi Kuat**: Dikelola oleh **Laravel** untuk signaling, autentikasi (JWT), dan manajemen siklus hidup ruangan.
 
-## 🏗️ Architecture
+## 🏗️ Arsitektur
 
-SignalCore uses a decoupled architecture to separate business logic from media processing:
+SignalCore menggunakan arsitektur yang terpisah (decoupled) untuk memisahkan logika bisnis dari pemrosesan media:
 
 - **Frontend**: React (Vite) + Tailwind CSS
-- **API/Orchestration**: Laravel 12 (PHP 8.2+)
-- **SFU (Media Server)**: Node.js + Mediasoup (C++ internals)
-- **State/Metrics**: Redis (Real-time node health and room state)
+- **API/Orkestrasi**: Laravel 12 (PHP 8.2+)
+- **SFU (Media Server)**: Node.js + Mediasoup (internal C++)
+- **State/Metrik**: Redis (kesehatan node real-time dan state ruangan)
 
 ```mermaid
 graph TD
@@ -28,23 +28,23 @@ graph TD
     SFU <--> Redis
 ```
 
-## 🛠️ Tech Stack
+## 🛠️ Stack Teknologi
 
 - **Backend**: Laravel 12, PHP 8.2, MySQL/PostgreSQL
-- **Real-time**: Mediasoup, Socket.io (or Laravel WebSockets)
+- **Real-time**: Mediasoup, Socket.io (atau Laravel WebSockets)
 - **Frontend**: React 18, TypeScript, Vite
-- **Infrastructure**: Redis, Coturn (STUN/TURN)
+- **Infrastruktur**: Redis, Coturn (STUN/TURN)
 
-## 📋 Prerequisites
+## 📋 Prasyarat
 
 - **PHP** >= 8.2
 - **Node.js** >= 18
 - **Composer**
 - **Redis**
-- **MySQL** or **PostgreSQL**
-- **Build Tools** (gcc, g++, make for mediasoup compilation)
+- **MySQL** atau **PostgreSQL**
+- **Build Tools** (gcc, g++, make untuk kompilasi mediasoup)
 
-## 🔧 Installation
+## 🔧 Instalasi
 
 ### 1. API (Laravel)
 ```bash
@@ -60,7 +60,7 @@ php artisan serve --port=8000
 ```bash
 cd sfu
 npm install
-# Ensure you have build tools installed for mediasoup
+# Pastikan build tools sudah terinstall untuk mediasoup
 npm start
 ```
 
@@ -71,15 +71,15 @@ npm install
 npm run dev
 ```
 
-## 🔒 Security
+## 🔒 Keamanan
 
-- **JWT Authentication**: Secure signaling access.
-- **RS256 Signing**: Laravel signs tokens, SFU verifies them with public keys.
-- **DTLS-SRTP**: Fully encrypted media streams.
+- **Autentikasi JWT**: Akses signaling yang aman.
+- **Penandatanganan RS256**: Laravel menandatangani token, SFU memverifikasi dengan kunci publik.
+- **DTLS-SRTP**: Aliran media yang terenkripsi penuh.
 
-## 📄 License
+## 📄 Lisensi
 
 Proprietary / Enterprise.
 
 ---
-Built with ❤️ for High-Performance Communication.
+Dibuat dengan ❤️ untuk Komunikasi Performa Tinggi.

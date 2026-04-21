@@ -215,7 +215,7 @@ export default function Room() {
 
                 case 'peerLeft': {
                     const { userId: leftUserId } = payload;
-                    console.info(`[ROOM] Peer left: ${leftUserId}`);
+                    console.info(`[ROOM] Peer left signal received for: ${leftUserId}`);
                     removePeer(String(leftUserId));
                     break;
                 }
@@ -336,9 +336,10 @@ export default function Room() {
     }
 
     function stopShareScreen() {
-        // 1. Close producer on SFU
+        // Cleanup producers owned by this peer
         if (screenProducerRef.current) {
             const producerId = screenProducerRef.current.id;
+            console.log(`[WS] Closing screen producer:${producerId} for user:${userId}`);
             screenProducerRef.current.close();
             screenProducerRef.current = null;
             

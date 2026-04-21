@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Device, types } from 'mediasoup-client';
 import { useRoomStore } from '../store/useRoomStore';
 import { VideoGrid } from '../components/VideoGrid';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Link2, Check } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Link2, Check, Monitor } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface PendingProducer {
@@ -12,7 +12,7 @@ interface PendingProducer {
 }
 
 export default function Room() {
-    const { mediaToken, roomId, userId, setConnected, addPeer, removePeer, setPeerMediaState } = useRoomStore();
+    const { mediaToken, roomId, userId, roomCreatedAt, setConnected, addPeer, removePeer, clearPeers, setPeerMediaState } = useRoomStore();
     const navigate = useNavigate();
     
     const wsRef = useRef<WebSocket | null>(null);
@@ -20,13 +20,43 @@ export default function Room() {
     const sendTransportRef = useRef<types.Transport | null>(null);
     const recvTransportRef = useRef<types.Transport | null>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
+    const screenProducerRef = useRef<types.Producer | null>(null);
     const pendingProducersRef = useRef<PendingProducer[]>([]);
 
     const [micOn, setMicOn] = useState(true);
     const [videoOn, setVideoOn] = useState(true);
+    const [screenOn, setScreenOn] = useState(false);
     // Local video track exposed as state so VideoGrid re-renders when camera starts
     const [localVideoTrack, setLocalVideoTrack] = useState<MediaStreamTrack | null>(null);
+    const [localScreenTrack, setLocalScreenTrack] = useState<MediaStreamTrack | null>(null);
+    const localScreenTrackRef = useRef<MediaStreamTrack | null>(null);
     const [copied, setCopied] = useState(false);
+    const [duration, setDuration] = useState('00:00');
+    
+    // Calculate start time based on room creation
+    const startTimeRef = useRef(roomCreatedAt ? new Date(roomCreatedAt).getTime() : Date.now());
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            const now = Date.now();
+            const diff = Math.floor((now - startTimeRef.current) / 1000);
+            
+            // Protect against negative values if client time is slightly behind server
+            const absDiff = Math.max(0, diff);
+            
+            const hours = Math.floor(absDiff / 3600);
+            const minutes = Math.floor((absDiff % 3600) / 60);
+            const seconds = absDiff % 60;
+
+            const parts = [];
+            if (hours > 0) parts.push(hours.toString().padStart(2, '0'));
+            parts.push(minutes.toString().padStart(2, '0'));
+            parts.push(seconds.toString().padStart(2, '0'));
+            
+            setDuration(parts.join(':'));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
 
     const handleCopyInvite = () => {
         const inviteUrl = `${window.location.origin}/?room=${roomId}`;
@@ -60,6 +90,7 @@ export default function Room() {
                 case 'auth_success': {
                     if (!isMounted) break;
                     console.info('[AUTH] Success!');
+                    clearPeers(); // Clear stale peers before adding new ones
                     setConnected(true);
                     const device = new Device();
                     await device.load({ routerRtpCapabilities: payload.routerRtpCapabilities });
@@ -73,10 +104,11 @@ export default function Room() {
                     if (payload.existingProducers) {
                         console.info(`[ROOM] Queuing ${payload.existingProducers.length} existing producers`);
                         payload.existingProducers.forEach((p: any) => {
+                            const source = p.appData?.source || 'camera';
                             pendingProducersRef.current.push({
                                 producerId: p.producerId,
                                 userId: p.userId,
-                                kind: p.kind
+                                kind: source === 'screen' ? 'screen' : p.kind
                             });
                         });
                     }
@@ -154,19 +186,21 @@ export default function Room() {
                 }
 
                 case 'newProducer': {
-                    const { producerId, userId: peerId, kind } = payload;
-                    console.info(`[ROOM] New producer available: ${kind} from ${peerId}`);
+                    const { producerId, userId: peerId, kind, appData } = payload;
+                    const source = appData?.source || 'camera';
+                    console.info(`[ROOM] New producer available: ${kind} (${source}) from ${peerId}`);
                     if (!recvTransportRef.current) {
-                        pendingProducersRef.current.push({ producerId, userId: peerId, kind });
+                        pendingProducersRef.current.push({ producerId, userId: peerId, kind: source === 'screen' ? 'screen' : kind });
                     } else {
-                        consume(producerId, peerId, kind);
+                        consume(producerId, peerId, source === 'screen' ? 'screen' : kind);
                     }
                     break;
                 }
 
                 case 'consumed': {
-                    const { id, kind, rtpParameters, producerId, peerId } = payload;
-                    console.info(`[ROOM] Consumed ${kind} from producer:${producerId}`);
+                    const { id, kind, rtpParameters, producerId, peerId, appData } = payload;
+                    const source = appData?.source || 'camera';
+                    console.info(`[ROOM] Consumed ${kind} (${source}) from producer:${producerId}`);
                     const consumer = await recvTransportRef.current!.consume({
                         id,
                         producerId,
@@ -175,7 +209,7 @@ export default function Room() {
                     });
                     
                     ws.send(JSON.stringify({ type: 'resumeConsumer', payload: { consumerId: consumer.id } }));
-                    addPeer(peerId, kind, consumer.track);
+                    addPeer(peerId, source === 'screen' ? 'screen' : kind, consumer.track);
                     break;
                 }
 
@@ -190,6 +224,13 @@ export default function Room() {
                     const { userId: toggleUserId, kind, isMuted } = payload;
                     console.info(`[ROOM] Peer ${toggleUserId} toggled ${kind} to ${isMuted ? 'muted' : 'unmuted'}`);
                     setPeerMediaState(String(toggleUserId), kind, isMuted);
+                    break;
+                }
+
+                case 'producerClosed': {
+                    const { userId: closedUserId, kind } = payload;
+                    console.info(`[ROOM] Producer closed: ${kind} from ${closedUserId}`);
+                    addPeer(String(closedUserId), kind, null);
                     break;
                 }
             }
@@ -217,9 +258,9 @@ export default function Room() {
                 addPeer(userId!.toString(), 'audio', audioTrack);
 
                 console.info('[MEDIA] Producing local video track...');
-                if (videoTrack) await transport.produce({ track: videoTrack });
+                if (videoTrack) await transport.produce({ track: videoTrack, appData: { source: 'camera' } });
                 console.info('[MEDIA] Producing local audio track...');
-                if (audioTrack) await transport.produce({ track: audioTrack });
+                if (audioTrack) await transport.produce({ track: audioTrack, appData: { source: 'mic' } });
             } catch (err: any) {
                 console.error("[MEDIA] Error accessing media:", err?.name, err?.message);
                 // If audio fails, try video-only
@@ -231,7 +272,7 @@ export default function Room() {
                         const videoTrack = stream.getVideoTracks()[0];
                         setLocalVideoTrack(videoTrack ?? null);
                         setMicOn(false); // No mic available
-                        if (videoTrack) await transport.produce({ track: videoTrack });
+                        if (videoTrack) await transport.produce({ track: videoTrack, appData: { source: 'camera' } });
                     } catch (e) {
                         console.error('[MEDIA] Video-only also failed:', e);
                     }
@@ -263,16 +304,96 @@ export default function Room() {
             sendTransportRef.current = null;
             recvTransportRef.current = null;
             setConnected(false);
+            clearPeers();
             setLocalVideoTrack(null);
             localStreamRef.current?.getTracks().forEach(t => t.stop());
         };
     }, [roomId, mediaToken]);
 
+    async function handleShareScreen() {
+        if (!sendTransportRef.current) return;
+        try {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            const track = stream.getVideoTracks()[0];
+            
+            localScreenTrackRef.current = track; // Track in ref for reliable cleanup
+            setLocalScreenTrack(track);
+            setScreenOn(true);
+            addPeer(userId!.toString(), 'screen', track);
+
+            const producer = await sendTransportRef.current.produce({ 
+                track, 
+                appData: { source: 'screen' } 
+            });
+            screenProducerRef.current = producer;
+
+            track.onended = () => {
+                stopShareScreen();
+            };
+        } catch (err) {
+            console.error('[SCREEN] Error sharing screen:', err);
+        }
+    }
+
+    function stopShareScreen() {
+        // 1. Close producer on SFU
+        if (screenProducerRef.current) {
+            const producerId = screenProducerRef.current.id;
+            screenProducerRef.current.close();
+            screenProducerRef.current = null;
+            
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+                wsRef.current.send(JSON.stringify({
+                    type: 'closeProducer',
+                    payload: { producerId }
+                }));
+            }
+        }
+
+        // 2. Stop and clear local track
+        const track = localScreenTrackRef.current;
+        if (track) {
+            track.stop();
+            localScreenTrackRef.current = null;
+        }
+        setLocalScreenTrack(null);
+        setScreenOn(false);
+
+        // 3. Update store
+        addPeer(userId!.toString(), 'screen', null);
+    }
+
     return (
-        <div className="flex flex-col h-screen bg-gray-950 text-white">
-            <div className="flex-1 overflow-hidden">
+        <div className="flex flex-col h-screen bg-gray-950 text-white font-sans">
+            {/* Header with Clock */}
+            <header className="h-14 px-6 flex items-center justify-between bg-gray-900/80 backdrop-blur-md border-b border-gray-800 z-10">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/20">
+                        <Video size={16} className="text-white" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="font-bold text-white tracking-tight">SignalCore</span>
+                        <span className="text-gray-600">/</span>
+                        <span className="text-sm text-gray-400 font-medium bg-gray-800 px-2 py-0.5 rounded border border-gray-700">Room: {roomId}</span>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-6">
+                    <div className="flex flex-col items-end">
+                        <span className="text-xl font-semibold text-white leading-none tracking-tight tabular-nums">
+                            {duration}
+                        </span>
+                        <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mt-1">
+                            Duration
+                        </span>
+                    </div>
+                </div>
+            </header>
+
+            <div className="flex-1 overflow-hidden relative">
                 <VideoGrid
                     localVideoTrack={localVideoTrack}
+                    localScreenTrack={localScreenTrack}
                     localUserId={userId?.toString()}
                     localMicOn={micOn}
                 />
@@ -318,6 +439,19 @@ export default function Room() {
                     className={`p-4 rounded-full transition ${videoOn ? 'bg-gray-800 hover:bg-gray-700' : 'bg-red-600 hover:bg-red-700'}`}
                 >
                     {videoOn ? <Video size={24} /> : <VideoOff size={24} />}
+                </button>
+                <button 
+                    onClick={() => {
+                        if (screenOn) {
+                            stopShareScreen();
+                        } else {
+                            handleShareScreen();
+                        }
+                    }}
+                    className={`p-4 rounded-full transition ${screenOn ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    title={screenOn ? "Stop sharing screen" : "Share screen"}
+                >
+                    <Monitor size={24} />
                 </button>
                 <button className="p-4 rounded-full bg-red-600 hover:bg-red-700 text-white transition" onClick={() => navigate('/')}>
                     <PhoneOff size={24} />

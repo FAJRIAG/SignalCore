@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { useRoomStore } from '../store/useRoomStore';
@@ -18,6 +18,14 @@ export default function Login() {
   const [roomId, setRoomId] = useState(initialRoomId);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }));
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const { setAuth, setRoom } = useRoomStore();
   const navigate = useNavigate();
@@ -59,7 +67,7 @@ export default function Login() {
 
       // 3. Join the room
       const { data: joinData } = await axios.post(`${API_URL}/rooms/${targetRoomId}/join`, {}, { headers });
-      setRoom(targetRoomId, joinData.media_token, joinData.node_id);
+      setRoom(targetRoomId, joinData.media_token, joinData.node_id, joinData.room.created_at);
       navigate(`/room/${targetRoomId}`);
     } catch (err: any) {
       setError(err?.response?.data?.message ?? 'Failed to join. Check your credentials or room ID.');
@@ -69,8 +77,22 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-      <div className="bg-gray-900 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-gray-800 relative overflow-hidden">
+    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[120px]" />
+      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-600/10 rounded-full blur-[120px]" />
+
+      {/* Floating Clock */}
+      <div className="absolute top-8 right-8 text-right">
+        <div className="text-3xl font-light text-white tracking-tighter tabular-nums">
+          {currentTime}
+        </div>
+        <div className="text-[10px] text-gray-500 uppercase tracking-[0.2em] font-bold mt-1">
+          WIB
+        </div>
+      </div>
+
+      <div className="bg-gray-900 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-gray-800 relative overflow-hidden z-10 transition-all hover:border-gray-700/50">
         {/* Top accent bar */}
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-600" />
 

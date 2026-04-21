@@ -88,29 +88,76 @@ const VideoElement = ({ track, audioTrack, muted = false, label, micMuted = fals
 
 interface VideoGridProps {
   localVideoTrack?: MediaStreamTrack | null;
+  localScreenTrack?: MediaStreamTrack | null;
   localUserId?: string;
   localMicOn?: boolean;
 }
 
-export const VideoGrid = ({ localVideoTrack, localUserId, localMicOn = true }: VideoGridProps) => {
+export const VideoGrid = ({ localVideoTrack, localScreenTrack, localUserId, localMicOn = true }: VideoGridProps) => {
   const { peers } = useRoomStore();
 
   const remotePeers = Object.entries(peers).filter(([id]) => id !== localUserId);
 
   const localHasVideo  = !!localVideoTrack;
+  const localHasScreen = !!localScreenTrack;
   const remoteOnCam    = remotePeers.filter(([, p]) => p.video && !p.videoMuted);
   const remoteOffCam   = remotePeers.filter(([, p]) => !p.video || p.videoMuted);
-  const anyoneHasCam   = localHasVideo || remoteOnCam.length > 0;
+  
+  // Find who is sharing screen (prioritize remote screens)
+  const remoteSharer = remotePeers.find(([, p]) => p.screen);
+  const someoneSharingScreen = localHasScreen || !!remoteSharer;
 
   // Function to calculate responsive tile sizes
   const getResponsiveClass = (count: number) => {
-    if (count === 1) return 'w-full max-w-3xl';
-    if (count === 2) return 'w-full md:w-[48%] max-w-2xl'; // Stacks on mobile, side-by-side on md+
-    if (count <= 4)  return 'w-[48%] sm:w-[48%]';          // 2x2 grid on mobile and up
-    return 'w-[48%] sm:w-[31%] lg:w-[23%]';                // 2 cols mobile, 3 cols sm, 4 cols lg
+    if (count === 1) return 'w-full max-w-4xl';
+    if (count === 2) return 'w-full md:w-[48%] max-w-2xl';
+    if (count <= 4)  return 'w-[48%] sm:w-[48%]';
+    return 'w-[48%] sm:w-[31%] lg:w-[23%]';
   };
 
-  // ── When NOBODY has camera: flat equal grid for everyone ──────────────────
+  // ── FEATURED SCREEN SHARE LAYOUT ──────────────────────────────────────────
+  if (someoneSharingScreen) {
+    return (
+      <div className="w-full h-full bg-gray-950 flex flex-col pt-2 sm:pt-4">
+        {/* Main: The Screen Share */}
+        <div className="flex-1 flex items-center justify-center overflow-hidden p-2">
+            <div className="w-full h-full max-w-7xl">
+                {localHasScreen ? (
+                    <VideoElement track={localScreenTrack} muted label="Your Screen" />
+                ) : (
+                    <VideoElement 
+                        track={remoteSharer![1].screen} 
+                        label={`User ${remoteSharer![0]}'s Screen`} 
+                    />
+                )}
+            </div>
+        </div>
+
+        {/* Bottom: All participants' cameras */}
+        <div className="h-32 sm:h-48 flex flex-nowrap items-center justify-start sm:justify-center gap-2 sm:gap-3 p-2 sm:p-4 flex-shrink-0 overflow-x-auto w-full custom-scrollbar bg-gray-900/50">
+          {/* Local Camera */}
+          <div className="w-40 sm:w-64 flex-shrink-0">
+             <VideoElement track={localVideoTrack} muted label="You" micMuted={!localMicOn} />
+          </div>
+          {/* Remote Cameras */}
+          {remotePeers.map(([uid, peer]) => (
+            <div key={uid} className="w-40 sm:w-64 flex-shrink-0">
+              <VideoElement 
+                track={peer.video ?? null} 
+                audioTrack={peer.audio ?? null} 
+                label={`User ${uid}`} 
+                micMuted={peer.audioMuted} 
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── STANDARD GRID LAYOUT (Existing logic) ─────────────────────────────────
+  const anyoneHasCam = localHasVideo || remoteOnCam.length > 0;
+
   if (!anyoneHasCam) {
     const total = 1 + remotePeers.length;
     const flatClass = getResponsiveClass(total);
@@ -131,25 +178,19 @@ export const VideoGrid = ({ localVideoTrack, localUserId, localMicOn = true }: V
     );
   }
 
-  // ── At least one person has camera: split layout ───────────────────────────
-  // Main = camera-ON  |  Bottom = camera-OFF
   const mainCount = (localHasVideo ? 1 : 0) + remoteOnCam.length;
   const mainClass = getResponsiveClass(mainCount);
   const hasBottom = !localHasVideo || remoteOffCam.length > 0;
 
   return (
     <div className="w-full h-full bg-gray-900 flex flex-col pt-2 sm:pt-4">
-
-      {/* ── Main area: camera-ON participants ────────────────── */}
       <div className="flex-1 flex items-center justify-center overflow-y-auto">
         <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 px-2 sm:px-4 w-full max-w-6xl">
-
           {localHasVideo && (
             <div className={mainClass}>
               <VideoElement track={localVideoTrack} muted label="You" micMuted={!localMicOn} />
             </div>
           )}
-
           {remoteOnCam.map(([uid, peer]) => (
             <div key={uid} className={mainClass}>
               <VideoElement
@@ -163,7 +204,6 @@ export const VideoGrid = ({ localVideoTrack, localUserId, localMicOn = true }: V
         </div>
       </div>
 
-      {/* ── Bottom strip: camera-OFF participants ─────────────── */}
       {hasBottom && (
         <div className="flex flex-nowrap items-center justify-start sm:justify-center gap-2 sm:gap-3 p-2 sm:p-4 flex-shrink-0 overflow-x-auto w-full custom-scrollbar">
           {!localHasVideo && (

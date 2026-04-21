@@ -41,32 +41,47 @@ function getNextWorker() {
     return worker;
 }
 
+// Pending Router creations: roomId -> Promise<Router>
+const routerPromises: Map<string, Promise<mediasoup.types.Router>> = new Map();
+
 export async function createRoomRouter(roomId: string) {
     if (routers.has(roomId)) return routers.get(roomId);
+    
+    // If a creation is already in progress, return the existing promise
+    if (routerPromises.has(roomId)) return routerPromises.get(roomId);
 
-    const worker = getNextWorker();
-    if (!worker) throw new Error('No Mediasoup worker available');
-    const router = await worker.createRouter({
-        mediaCodecs: [
-            {
-                kind: 'audio',
-                mimeType: 'audio/opus',
-                clockRate: 48000,
-                channels: 2
-            },
-            {
-                kind: 'video',
-                mimeType: 'video/VP8',
-                clockRate: 90000,
-                parameters: {
-                    'x-google-start-bitrate': 1000
-                }
-            }
-        ]
-    });
+    const createPromise = (async () => {
+        try {
+            const worker = getNextWorker();
+            if (!worker) throw new Error('No Mediasoup worker available');
+            const router = await worker.createRouter({
+                mediaCodecs: [
+                    {
+                        kind: 'audio',
+                        mimeType: 'audio/opus',
+                        clockRate: 48000,
+                        channels: 2
+                    },
+                    {
+                        kind: 'video',
+                        mimeType: 'video/VP8',
+                        clockRate: 90000,
+                        parameters: {
+                            'x-google-start-bitrate': 1000
+                        }
+                    }
+                ]
+            });
+            routers.set(roomId, router);
+            return router;
+        } finally {
+            // Cleanup promise once done
+            routerPromises.delete(roomId);
+        }
+    })();
 
-    routers.set(roomId, router);
-    return router;
+    routerPromises.set(roomId, createPromise);
+    return createPromise;
 }
 
 export async function createWebRtcTransport(roomId: string) {

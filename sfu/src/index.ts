@@ -67,7 +67,8 @@ wss.on('connection', (ws: WebSocket, req) => {
                                 existingProducers.push({
                                     producerId: producer.id,
                                     userId: producer.appData.userId,
-                                    kind: producer.kind
+                                    kind: producer.kind,
+                                    appData: producer.appData
                                 });
                             }
                         }
@@ -111,15 +112,16 @@ wss.on('connection', (ws: WebSocket, req) => {
                 }
 
                 case 'produce': {
-                    const { transportId, kind, rtpParameters } = payload;
-                    console.log(`[PRODUCE] User:${userId} producing ${kind} on transport:${transportId}`);
-                    const producerId = await produce(transportId, kind, rtpParameters, { userId, roomId });
+                    const { transportId, kind, rtpParameters, appData: clientAppData } = payload;
+                    const source = clientAppData?.source || 'camera';
+                    console.log(`[PRODUCE] User:${userId} producing ${kind} (${source}) on transport:${transportId}`);
+                    const producerId = await produce(transportId, kind, rtpParameters, { userId, roomId, ...clientAppData });
                     ws.send(JSON.stringify({ type: 'produced', payload: { id: producerId } }));
                     
                     // Broadcast new producer to room
                     broadcastToRoom(roomId, {
                         type: 'newProducer',
-                        payload: { producerId, userId, kind }
+                        payload: { producerId, userId, kind, appData: { userId, roomId, ...clientAppData } }
                     }, ws);
                     break;
                 }
@@ -146,10 +148,18 @@ wss.on('connection', (ws: WebSocket, req) => {
                     consumers.set(consumer.id, consumer);
 
                     consumer.on('transportclose', () => {
+                        console.log(`[CONSUME] Transport closed, closing consumer:${consumer.id}`);
                         consumer.close();
                         consumers.delete(consumer.id);
                     });
+                    
                     consumer.on('producerclose', () => {
+                        console.log(`[CONSUME] Producer closed, closing consumer:${consumer.id}`);
+                        // Notify client to remove this peer's track
+                        ws.send(JSON.stringify({ 
+                            type: 'producerClosed', 
+                            payload: { userId: peerId, producerId, kind: consumer.kind === 'video' ? 'camera' : (consumer.kind === 'audio' ? 'audio' : 'screen') } 
+                        }));
                         consumer.close();
                         consumers.delete(consumer.id);
                     });
@@ -162,7 +172,8 @@ wss.on('connection', (ws: WebSocket, req) => {
                             producerId,
                             kind: consumer.kind,
                             rtpParameters: consumer.rtpParameters,
-                            peerId // Pass back the peerId so client knows who it's consuming from
+                            peerId,
+                            appData: producers.get(producerId)?.appData
                         }
                     }));
                     break;
@@ -186,6 +197,24 @@ wss.on('connection', (ws: WebSocket, req) => {
                         type: 'peerToggledMedia',
                         payload: { userId, kind, isMuted }
                     }, ws);
+                    break;
+                }
+
+                case 'closeProducer': {
+                    const { producerId } = payload;
+                    console.log(`[CLOSE_PRODUCER] User:${userId} closing producer:${producerId}`);
+                    const producer = producers.get(producerId);
+                    if (producer) {
+                        const kind = producer.appData.source === 'screen' ? 'screen' : producer.kind;
+                        producer.close();
+                        producers.delete(producerId);
+
+                        // Notify others
+                        broadcastToRoom(roomId, {
+                            type: 'producerClosed',
+                            payload: { userId, producerId, kind }
+                        }, ws);
+                    }
                     break;
                 }
             }

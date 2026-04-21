@@ -1,0 +1,38 @@
+# Root .gitignore for SignalCore
+
+# Dependencies
+node_modules/
+vendor/
+client/node_modules/
+sfu/node_modules/
+api/vendor/
+api/node_modules/
+
+# Environment files
+.env
+api/.env
+client/.env
+sfu/.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Laravel specific (if any in root, though api/ handles its own usually)
+api/storage/*.key
+api/storage/framework/cache/data/*
+api/storage/framework/sessions/*
+api/storage/framework/testing/*
+api/storage/framework/views/*
+api/storage/logs/*
+
+# Redis
+dump.rdb
+
+# Build files
+client/dist/
+sfu/dist/
+
+# IDE files
+.vscode/
+.idea/

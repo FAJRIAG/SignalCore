@@ -75,7 +75,9 @@ export default function Room() {
         let isMounted = true; // guard against StrictMode double-mount
 
         console.info('[ROOM] Connecting to SFU...');
-        const ws = new WebSocket('ws://localhost:3000');
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
+
         wsRef.current = ws;
 
         ws.onopen = () => {

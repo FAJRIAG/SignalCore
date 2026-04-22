@@ -21,7 +21,7 @@ interface RoomState {
 
 export const useRoomStore = create<RoomState>((set) => ({
   roomId: null,
-  userId: null,
+  userId: localStorage.getItem('userId') ? parseInt(localStorage.getItem('userId')!) : null,
   token: localStorage.getItem('token'),
   mediaToken: null,
   nodeId: null,
@@ -31,16 +31,20 @@ export const useRoomStore = create<RoomState>((set) => ({
   activeSpeakers: [],
   setAuth: (token, userId) => {
     localStorage.setItem('token', token);
+    localStorage.setItem('userId', userId.toString());
     set({ token, userId });
   },
   setRoom: (roomId, mediaToken, nodeId, roomCreatedAt) => set({ roomId, mediaToken, nodeId, roomCreatedAt }),
   setConnected: (status) => set({ connected: status }),
   addPeer: (userId, kind, track) => set((state) => {
     const peers = { ...state.peers };
-    const peer = peers[userId] || { video: null, audio: null, screen: null };
+    // Create a new object for the peer to ensure React detects the change
+    const peer = { ...(peers[userId] || { video: null, audio: null, screen: null, videoMuted: false, audioMuted: false }) };
+    
     if (kind === 'video') peer.video = track;
     if (kind === 'audio') peer.audio = track;
     if (kind === 'screen') peer.screen = track;
+    
     peers[userId] = peer;
     return { peers };
   }),

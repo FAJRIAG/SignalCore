@@ -92,7 +92,7 @@ export async function createWebRtcTransport(roomId: string) {
         listenIps: [
             {
                 ip: '0.0.0.0',
-                announcedIp: '127.0.0.1' // for local dev
+                announcedIp: '192.168.1.245' // for LAN access
             }
         ],
         enableUdp: true,

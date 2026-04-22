@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useRoomStore } from '../store/useRoomStore';
 import { Video, LogIn } from 'lucide-react';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = '/api';
 
 export default function Login() {
   const [searchParams] = useSearchParams();

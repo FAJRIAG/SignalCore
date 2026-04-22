@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Device, types } from 'mediasoup-client';
 import { useRoomStore } from '../store/useRoomStore';
 import { VideoGrid } from '../components/VideoGrid';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Link2, Check, Monitor } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Link2, Check, Monitor, Edit3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Whiteboard } from '../components/Whiteboard';
 
 interface PendingProducer {
     producerId: string;
@@ -12,7 +13,19 @@ interface PendingProducer {
 }
 
 export default function Room() {
-    const { mediaToken, roomId, userId, roomCreatedAt, setConnected, addPeer, removePeer, clearPeers, setPeerMediaState } = useRoomStore();
+    const { 
+        mediaToken, 
+        roomId, 
+        userId, 
+        roomCreatedAt, 
+        setConnected, 
+        addPeer, 
+        removePeer, 
+        clearPeers, 
+        setPeerMediaState,
+        isWhiteboardOpen,
+        setIsWhiteboardOpen
+    } = useRoomStore();
     const navigate = useNavigate();
     
     const wsRef = useRef<WebSocket | null>(null);
@@ -235,6 +248,18 @@ export default function Room() {
                     addPeer(String(closedUserId), kind, null);
                     break;
                 }
+
+                case 'whiteboardDraw':
+                case 'whiteboardClear':
+                case 'whiteboardToggle': {
+                    // Use custom events for high-frequency whiteboard data to avoid React state batching/dropping messages
+                    window.dispatchEvent(new CustomEvent('whiteboard-signal', { detail: { type, payload } }));
+                    
+                    if (type === 'whiteboardToggle') {
+                        setIsWhiteboardOpen(payload.isOpen);
+                    }
+                    break;
+                }
             }
         };
 
@@ -400,6 +425,27 @@ export default function Room() {
                     localUserId={userId?.toString()}
                     localMicOn={micOn}
                 />
+
+                {isWhiteboardOpen && (
+                    <Whiteboard
+                        onDraw={(data) => {
+                            if (wsRef.current?.readyState === WebSocket.OPEN) {
+                                wsRef.current.send(JSON.stringify({ type: 'whiteboardDraw', payload: data }));
+                            }
+                        }}
+                        onClear={() => {
+                            if (wsRef.current?.readyState === WebSocket.OPEN) {
+                                wsRef.current.send(JSON.stringify({ type: 'whiteboardClear' }));
+                            }
+                        }}
+                        onClose={() => {
+                            setIsWhiteboardOpen(false);
+                            if (wsRef.current?.readyState === WebSocket.OPEN) {
+                                wsRef.current.send(JSON.stringify({ type: 'whiteboardToggle', payload: { isOpen: false } }));
+                            }
+                        }}
+                    />
+                )}
             </div>
             <div className="h-20 bg-gray-900 border-t border-gray-800 flex items-center justify-center space-x-6 px-6">
                 <button 
@@ -455,6 +501,19 @@ export default function Room() {
                     title={screenOn ? "Stop sharing screen" : "Share screen"}
                 >
                     <Monitor size={24} />
+                </button>
+                <button 
+                    onClick={() => {
+                        const newState = !isWhiteboardOpen;
+                        setIsWhiteboardOpen(newState);
+                        if (wsRef.current?.readyState === WebSocket.OPEN) {
+                            wsRef.current.send(JSON.stringify({ type: 'whiteboardToggle', payload: { isOpen: newState } }));
+                        }
+                    }}
+                    className={`p-4 rounded-full transition ${isWhiteboardOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    title="Whiteboard"
+                >
+                    <Edit3 size={24} />
                 </button>
                 <button className="p-4 rounded-full bg-red-600 hover:bg-red-700 text-white transition" onClick={() => navigate('/')}>
                     <PhoneOff size={24} />

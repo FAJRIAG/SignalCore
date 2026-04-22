@@ -17,6 +17,8 @@ interface RoomState {
   removePeer: (userId: string) => void;
   clearPeers: () => void;
   setPeerMediaState: (userId: string, kind: 'video' | 'audio', isMuted: boolean) => void;
+  isWhiteboardOpen: boolean;
+  setIsWhiteboardOpen: (isOpen: boolean) => void;
 }
 
 export const useRoomStore = create<RoomState>((set) => ({
@@ -63,4 +65,6 @@ export const useRoomStore = create<RoomState>((set) => ({
     }
     return { peers };
   }),
+  isWhiteboardOpen: false,
+  setIsWhiteboardOpen: (isOpen) => set({ isWhiteboardOpen: isOpen }),
 }));

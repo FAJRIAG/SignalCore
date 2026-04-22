@@ -217,6 +217,31 @@ wss.on('connection', (ws: WebSocket, req) => {
                     }
                     break;
                 }
+
+                case 'whiteboardDraw': {
+                    broadcastToRoom(roomId, {
+                        type: 'whiteboardDraw',
+                        payload: { userId, ...payload }
+                    }, ws);
+                    break;
+                }
+
+                case 'whiteboardClear': {
+                    broadcastToRoom(roomId, {
+                        type: 'whiteboardClear',
+                        payload: { userId }
+                    }, ws);
+                    break;
+                }
+
+                case 'whiteboardToggle': {
+                    const { isOpen } = payload;
+                    broadcastToRoom(roomId, {
+                        type: 'whiteboardToggle',
+                        payload: { userId, isOpen }
+                    }, ws);
+                    break;
+                }
             }
         } catch (error) {
             console.error('WS Error:', error);

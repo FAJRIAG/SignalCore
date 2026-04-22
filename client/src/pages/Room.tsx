@@ -24,7 +24,8 @@ export default function Room() {
         clearPeers, 
         setPeerMediaState,
         isWhiteboardOpen,
-        setIsWhiteboardOpen
+        setIsWhiteboardOpen,
+        clearRoom
     } = useRoomStore();
     const navigate = useNavigate();
     
@@ -515,7 +516,13 @@ export default function Room() {
                 >
                     <Edit3 size={24} />
                 </button>
-                <button className="p-4 rounded-full bg-red-600 hover:bg-red-700 text-white transition" onClick={() => navigate('/')}>
+                <button 
+                    className="p-4 rounded-full bg-red-600 hover:bg-red-700 text-white transition" 
+                    onClick={() => {
+                        clearRoom();
+                        navigate('/');
+                    }}
+                >
                     <PhoneOff size={24} />
                 </button>
 

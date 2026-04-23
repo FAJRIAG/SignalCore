@@ -27,9 +27,10 @@ interface VideoElementProps {
   muted?: boolean;
   label?: string;
   micMuted?: boolean;
+  isScreenShare?: boolean;
 }
 
-const VideoElement = ({ track, audioTrack, muted = false, label, micMuted = false }: VideoElementProps) => {
+const VideoElement = ({ track, audioTrack, muted = false, label, micMuted = false, isScreenShare = false }: VideoElementProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -44,13 +45,13 @@ const VideoElement = ({ track, audioTrack, muted = false, label, micMuted = fals
   }, [track]);
 
   return (
-    <div className="bg-gray-800 rounded-lg overflow-hidden flex items-center justify-center relative shadow-lg aspect-video">
+    <div className={`overflow-hidden flex items-center justify-center relative ${isScreenShare ? 'w-full h-full bg-transparent' : 'bg-gray-800 rounded-lg shadow-lg aspect-video w-full'}`}>
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted={muted}
-        className="w-full h-full object-cover"
+        className={`w-full h-full ${isScreenShare ? 'object-contain' : 'object-cover'}`}
       />
 
       {/* Remote audio — rendered separately to avoid mute conflict with video element */}
@@ -109,43 +110,44 @@ export const VideoGrid = ({ localVideoTrack, localScreenTrack, localUserId, loca
 
   // Function to calculate responsive tile sizes
   const getResponsiveClass = (count: number) => {
-    if (count === 1) return 'w-full max-w-4xl';
-    if (count === 2) return 'w-full md:w-[48%] max-w-2xl';
-    if (count <= 4)  return 'w-[48%] sm:w-[48%]';
-    return 'w-[48%] sm:w-[31%] lg:w-[23%]';
+    if (count === 1) return 'w-full max-w-4xl aspect-video';
+    if (count === 2) return 'w-full md:w-[48%] max-w-2xl aspect-video';
+    if (count <= 4)  return 'w-full sm:w-[48%] max-w-xl aspect-video';
+    return 'w-[48%] sm:w-[31%] lg:w-[23%] aspect-video';
   };
 
   // ── FEATURED SCREEN SHARE LAYOUT ──────────────────────────────────────────
   if (someoneSharingScreen) {
     return (
-      <div className="w-full h-full bg-gray-950 flex flex-col pt-2 sm:pt-4">
+      <div className="w-full h-full bg-gray-950 flex flex-col">
         {/* Main: The Screen Share */}
-        <div className="flex-1 flex items-center justify-center overflow-hidden p-2">
-            <div className="w-full h-full max-w-7xl">
+        <div className="flex-1 flex items-center justify-center overflow-hidden">
+            <div className="w-full h-full">
                 {localHasScreen ? (
-                    <VideoElement track={localScreenTrack} muted label="Your Screen" />
+                    <VideoElement track={localScreenTrack} muted label="Your Screen" isScreenShare />
                 ) : (
                     <VideoElement 
                         track={remoteSharer![1].screen} 
-                        label={`User ${remoteSharer![0]}'s Screen`} 
+                        label={`${remoteSharer![0]}'s Screen`} 
+                        isScreenShare
                     />
                 )}
             </div>
         </div>
 
         {/* Bottom: All participants' cameras */}
-        <div className="h-32 sm:h-48 flex flex-nowrap items-center justify-start sm:justify-center gap-2 sm:gap-3 p-2 sm:p-4 flex-shrink-0 overflow-x-auto w-full custom-scrollbar bg-gray-900/50">
+        <div className="h-24 sm:h-32 flex flex-nowrap items-center justify-start sm:justify-center gap-2 p-2 flex-shrink-0 overflow-x-auto w-full custom-scrollbar bg-black/40 backdrop-blur-sm">
           {/* Local Camera */}
-          <div className="w-40 sm:w-64 flex-shrink-0">
+          <div className="h-full aspect-video flex-shrink-0">
              <VideoElement track={localVideoTrack} muted label="You" micMuted={!localMicOn} />
           </div>
           {/* Remote Cameras */}
           {remotePeers.map(([uid, peer]) => (
-            <div key={uid} className="w-40 sm:w-64 flex-shrink-0">
+            <div key={uid} className="h-full aspect-video flex-shrink-0">
               <VideoElement 
                 track={peer.video ?? null} 
                 audioTrack={peer.audio ?? null} 
-                label={`User ${uid}`} 
+                label={peer.name || `User ${uid}`} 
                 micMuted={peer.audioMuted} 
               />
             </div>
@@ -183,7 +185,7 @@ export const VideoGrid = ({ localVideoTrack, localScreenTrack, localUserId, loca
   const hasBottom = !localHasVideo || remoteOffCam.length > 0;
 
   return (
-    <div className="w-full h-full bg-gray-900 flex flex-col pt-2 sm:pt-4">
+    <div className="w-full h-full bg-gray-900 flex flex-col">
       <div className="flex-1 flex items-center justify-center overflow-y-auto">
         <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 px-2 sm:px-4 w-full max-w-6xl">
           {localHasVideo && (

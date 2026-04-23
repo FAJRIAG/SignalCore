@@ -338,9 +338,14 @@ export default function Room() {
         };
     }, [roomId, mediaToken]);
 
+    const sharingScreenRef = useRef(false);
+
     async function handleShareScreen() {
-        if (!sendTransportRef.current) return;
+        if (!sendTransportRef.current || sharingScreenRef.current || screenOn) return;
+        
         try {
+            sharingScreenRef.current = true;
+            console.info('[SCREEN] Requesting screen share...');
             const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
             const track = stream.getVideoTracks()[0];
             
@@ -358,8 +363,14 @@ export default function Room() {
             track.onended = () => {
                 stopShareScreen();
             };
-        } catch (err) {
-            console.error('[SCREEN] Error sharing screen:', err);
+        } catch (err: any) {
+            if (err?.name === 'NotAllowedError') {
+                console.warn('[SCREEN] Screen share cancelled by user');
+            } else {
+                console.error('[SCREEN] Error sharing screen:', err);
+            }
+        } finally {
+            sharingScreenRef.current = false;
         }
     }
 
@@ -395,24 +406,26 @@ export default function Room() {
     return (
         <div className="flex flex-col h-screen bg-gray-950 text-white font-sans">
             {/* Header with Clock */}
-            <header className="h-14 px-6 flex items-center justify-between bg-gray-900/80 backdrop-blur-md border-b border-gray-800 z-10">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/20">
+            <header className="h-14 px-3 sm:px-6 flex items-center justify-between bg-gray-900/80 backdrop-blur-md border-b border-gray-800 z-10 shrink-0">
+                <div className="flex items-center gap-2 sm:gap-3 overflow-hidden mr-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/20 shrink-0">
                         <Video size={16} className="text-white" />
                     </div>
-                    <div className="flex items-center gap-2">
-                        <span className="font-bold text-white tracking-tight">SignalCore</span>
-                        <span className="text-gray-600">/</span>
-                        <span className="text-sm text-gray-400 font-medium bg-gray-800 px-2 py-0.5 rounded border border-gray-700">Room: {roomId}</span>
+                    <div className="flex items-center gap-1.5 sm:gap-2 overflow-hidden">
+                        <span className="font-bold text-white tracking-tight hidden xs:inline sm:inline">SignalCore</span>
+                        <span className="text-gray-600 hidden xs:inline sm:inline">/</span>
+                        <span className="text-[11px] sm:text-sm text-gray-400 font-medium bg-gray-800 px-2 py-0.5 rounded border border-gray-700 truncate">
+                            <span className="hidden sm:inline">Room: </span>{roomId}
+                        </span>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-3 sm:gap-6 shrink-0">
                     <div className="flex flex-col items-end">
-                        <span className="text-xl font-semibold text-white leading-none tracking-tight tabular-nums">
+                        <span className="text-lg sm:text-xl font-semibold text-white leading-none tracking-tight tabular-nums">
                             {duration}
                         </span>
-                        <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mt-1">
+                        <span className="text-[8px] sm:text-[10px] text-gray-500 uppercase tracking-widest font-bold mt-1">
                             Duration
                         </span>
                     </div>
@@ -448,7 +461,7 @@ export default function Room() {
                     />
                 )}
             </div>
-            <div className="h-20 bg-gray-900 border-t border-gray-800 flex items-center justify-center space-x-6 px-6">
+            <div className="h-20 sm:h-24 bg-gray-900/90 backdrop-blur-md border-t border-gray-800 flex items-center justify-center gap-2 sm:gap-6 px-3 sm:px-6 shrink-0 z-20">
                 <button 
                     onClick={() => {
                         const stream = localStreamRef.current;
@@ -465,9 +478,9 @@ export default function Room() {
                             }
                         }
                     }}
-                    className={`p-4 rounded-full transition ${micOn ? 'bg-gray-800 hover:bg-gray-700' : 'bg-red-600 hover:bg-red-700'}`}
+                    className={`p-3 sm:p-4 rounded-full transition-all duration-200 ${micOn ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}
                 >
-                    {micOn ? <Mic size={24} /> : <MicOff size={24} />}
+                    {micOn ? <Mic className="w-5 h-5 sm:w-6 sm:h-6" /> : <MicOff className="w-5 h-5 sm:w-6 sm:h-6" />}
                 </button>
                 <button 
                     onClick={() => {
@@ -486,9 +499,9 @@ export default function Room() {
                             }
                         }
                     }}
-                    className={`p-4 rounded-full transition ${videoOn ? 'bg-gray-800 hover:bg-gray-700' : 'bg-red-600 hover:bg-red-700'}`}
+                    className={`p-3 sm:p-4 rounded-full transition-all duration-200 ${videoOn ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}
                 >
-                    {videoOn ? <Video size={24} /> : <VideoOff size={24} />}
+                    {videoOn ? <Video className="w-5 h-5 sm:w-6 sm:h-6" /> : <VideoOff className="w-5 h-5 sm:w-6 sm:h-6" />}
                 </button>
                 <button 
                     onClick={() => {
@@ -498,10 +511,10 @@ export default function Room() {
                             handleShareScreen();
                         }
                     }}
-                    className={`p-4 rounded-full transition ${screenOn ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    className={`p-3 sm:p-4 rounded-full transition-all duration-200 ${screenOn ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-800 hover:bg-gray-700 text-white'}`}
                     title={screenOn ? "Stop sharing screen" : "Share screen"}
                 >
-                    <Monitor size={24} />
+                    <Monitor className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
                 <button 
                     onClick={() => {
@@ -511,28 +524,28 @@ export default function Room() {
                             wsRef.current.send(JSON.stringify({ type: 'whiteboardToggle', payload: { isOpen: newState } }));
                         }
                     }}
-                    className={`p-4 rounded-full transition ${isWhiteboardOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    className={`p-3 sm:p-4 rounded-full transition-all duration-200 ${isWhiteboardOpen ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-800 hover:bg-gray-700 text-white'}`}
                     title="Whiteboard"
                 >
-                    <Edit3 size={24} />
+                    <Edit3 className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
                 <button 
-                    className="p-4 rounded-full bg-red-600 hover:bg-red-700 text-white transition" 
+                    className="p-3 sm:p-4 rounded-full bg-red-600 hover:bg-red-700 text-white transition-all duration-200 shadow-lg shadow-red-900/20" 
                     onClick={() => {
                         clearRoom();
                         navigate('/');
                     }}
                 >
-                    <PhoneOff size={24} />
+                    <PhoneOff className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
 
                 {/* Invite button */}
                 <button
                     onClick={handleCopyInvite}
                     title="Copy invite link"
-                    className={`p-4 rounded-full transition flex items-center gap-2 ${copied ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    className={`p-3 sm:p-4 rounded-full transition-all duration-200 flex items-center gap-2 ${copied ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-800 hover:bg-gray-700 text-white'}`}
                 >
-                    {copied ? <Check size={24} /> : <Link2 size={24} />}
+                    {copied ? <Check className="w-5 h-5 sm:w-6 sm:h-6" /> : <Link2 className="w-5 h-5 sm:w-6 sm:h-6" />}
                 </button>
             </div>
         </div>

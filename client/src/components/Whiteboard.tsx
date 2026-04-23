@@ -156,29 +156,29 @@ export const Whiteboard: React.FC<WhiteboardProps> = ({ onDraw, onClear, onClose
   return (
     <div className="absolute inset-0 z-50 bg-gray-900 flex flex-col">
       {/* Toolbar */}
-      <div className="h-14 px-4 bg-gray-800 border-b border-gray-700 flex items-center justify-between shadow-lg">
-        <div className="flex items-center gap-4">
+      <div className="h-auto min-h-[3.5rem] py-2 px-3 bg-gray-800 border-b border-gray-700 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
           <div className="flex items-center gap-1 bg-gray-900 p-1 rounded-lg border border-gray-700">
             <button
               onClick={() => setMode('draw')}
-              className={`p-2 rounded-md transition ${mode === 'draw' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`p-1.5 sm:p-2 rounded-md transition ${mode === 'draw' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
               title="Pencil"
             >
               <Pencil size={18} />
             </button>
             <button
               onClick={() => setMode('erase')}
-              className={`p-2 rounded-md transition ${mode === 'erase' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`p-1.5 sm:p-2 rounded-md transition ${mode === 'erase' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
               title="Eraser"
             >
               <Eraser size={18} />
             </button>
           </div>
 
-          <div className="h-6 w-px bg-gray-700" />
+          <div className="hidden xs:block h-6 w-px bg-gray-700" />
 
           {/* Color Palette */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto max-w-[120px] sm:max-w-none no-scrollbar">
             {colors.map((c) => (
               <button
                 key={c}
@@ -186,13 +186,13 @@ export const Whiteboard: React.FC<WhiteboardProps> = ({ onDraw, onClear, onClose
                   setColor(c);
                   setMode('draw');
                 }}
-                className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${color === c && mode === 'draw' ? 'border-white scale-125' : 'border-transparent'}`}
+                className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 shrink-0 transition-transform hover:scale-110 ${color === c && mode === 'draw' ? 'border-white scale-110 sm:scale-125' : 'border-transparent'}`}
                 style={{ backgroundColor: c }}
               />
             ))}
           </div>
 
-          <div className="h-6 w-px bg-gray-700" />
+          <div className="hidden sm:block h-6 w-px bg-gray-700" />
 
           {/* Brush Size */}
           <input
@@ -201,24 +201,24 @@ export const Whiteboard: React.FC<WhiteboardProps> = ({ onDraw, onClear, onClose
             max="20"
             value={lineWidth}
             onChange={(e) => setLineWidth(parseInt(e.target.value))}
-            className="w-24 accent-blue-600 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+            className="w-20 sm:w-24 accent-blue-600 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
           />
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => {
                 clearLocalCanvas();
                 onClear();
             }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-red-600/10 text-red-500 hover:bg-red-600/20 transition text-sm font-medium border border-red-600/20"
+            className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-md bg-red-600/10 text-red-500 hover:bg-red-600/20 transition text-xs sm:text-sm font-medium border border-red-600/20"
           >
             <Trash2 size={16} />
-            Clear
+            <span className="hidden xs:inline">Clear</span>
           </button>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition"
+            className="p-1.5 sm:p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition"
           >
             <X size={20} />
           </button>

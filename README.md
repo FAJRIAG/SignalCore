@@ -1,24 +1,25 @@
 # SignalCore
 
-SignalCore adalah platform video conferencing berbasis web skala enterprise dengan performa tinggi. Dirancang untuk menampung lebih dari 100 pengguna konkuren dalam satu ruangan dengan latensi di bawah 300ms, menggunakan arsitektur Selective Forwarding Unit (SFU).
+SignalCore adalah platform video conferencing berbasis web skala enterprise dengan performa tinggi. Dirancang untuk menampung banyak pengguna konkuren dalam satu ruangan dengan latensi sangat rendah, menggunakan arsitektur Selective Forwarding Unit (SFU) yang canggih.
 
-## 🚀 Fitur Utama
+## 🚀 Fitur Utama & Optimasi Terbaru
 
-- **Skalabilitas Enterprise**: Mendukung 100+ pengguna per ruangan.
-- **Latensi Rendah**: Latensi glass-to-glass di bawah 300ms.
-- **Grid Adaptif**: Secara dinamis memprioritaskan pembicara aktif dan menyesuaikan tata letak berdasarkan jumlah peserta.
-- **Manajemen Bandwidth Cerdas**: Menggunakan Simulcast 3-lapis dan Selective Forwarding untuk mengoptimalkan performa.
-- **SFU Self-Hosted**: Ditenagai oleh **mediasoup** untuk performa media mentah yang maksimal.
-- **Orkestrasi Kuat**: Dikelola oleh **Laravel** untuk signaling, autentikasi (JWT), dan manajemen siklus hidup ruangan.
+- **Google Meet Style Layout**: Tata letak grid dinamis yang memastikan semua peserta tetap berada di pandangan utama. Peserta tanpa kamera akan ditampilkan dengan avatar inisial yang elegan, bukan kotak hitam.
+- **Client-Side Recording**: Fitur perekaman rapat langsung dari browser. Hasil rekaman disimpan secara lokal dalam format `.webm` berkualitas tinggi tanpa membebani server.
+- **Whiteboard Kolaboratif**: Papan tulis interaktif terintegrasi untuk kolaborasi visual secara real-time.
+- **Antarmuka Profesional & Bersih**: Desain minimalis tingkat enterprise yang fokus pada kegunaan (usability) dan estetika premium.
+- **Lokalisasi Bahasa Indonesia**: Antarmuka yang sepenuhnya dalam Bahasa Indonesia untuk kemudahan penggunaan lokal.
+- **Latensi Rendah**: Latensi di bawah 300ms berkat optimasi **mediasoup** SFU.
+- **Manajemen Bandwidth Cerdas**: Optimasi otomatis aliran media berdasarkan kondisi jaringan pengguna.
 
-## 🏗️ Arsitektur
+## 🏗️ Arsitektur Sistem
 
-SignalCore menggunakan arsitektur yang terpisah (decoupled) untuk memisahkan logika bisnis dari pemrosesan media:
+SignalCore memisahkan logika bisnis dari pemrosesan media untuk skalabilitas maksimal:
 
-- **Frontend**: React (Vite) + Tailwind CSS
-- **API/Orkestrasi**: Laravel 12 (PHP 8.2+)
-- **SFU (Media Server)**: Node.js + Mediasoup (internal C++)
-- **State/Metrik**: Redis (kesehatan node real-time dan state ruangan)
+- **Frontend**: React (Vite) + Tailwind CSS + Zustand (State Management).
+- **Orkestrator API**: Laravel 12 (Signaling, Autentikasi JWT, Manajemen Ruangan).
+- **SFU Media Node**: Node.js + Mediasoup (Engine media berbasis C++).
+- **State Synchronization**: Redis (Sinkronisasi metrik node dan status real-time).
 
 ```mermaid
 graph TD
@@ -30,23 +31,28 @@ graph TD
 
 ## 🛠️ Stack Teknologi
 
-- **Backend**: Laravel 12, PHP 8.2, MySQL/PostgreSQL
-- **Real-time**: Mediasoup, Socket.io (atau Laravel WebSockets)
-- **Frontend**: React 18, TypeScript, Vite
-- **Infrastruktur**: Redis, Coturn (STUN/TURN)
+- **Backend**: Laravel 12 (PHP 8.2+), MySQL/PostgreSQL.
+- **Real-time Media**: Mediasoup (SFU), WebRTC.
+- **Frontend**: React 18, TypeScript, Vite, Lucide Icons.
+- **Infrastruktur**: Redis (Metrics & Pub/Sub), Coturn (STUN/TURN).
 
-## 📋 Prasyarat
+## 🔧 Panduan Instalasi & Pengembangan
 
-- **PHP** >= 8.2
-- **Node.js** >= 18
-- **Composer**
-- **Redis**
-- **MySQL** atau **PostgreSQL**
-- **Build Tools** (gcc, g++, make untuk kompilasi mediasoup)
+### Prasyarat
+- PHP >= 8.2 & Composer
+- Node.js >= 18 & NPM
+- Redis Server (Berjalan di port 6379)
+- Build Tools (gcc, g++, make untuk kompilasi mediasoup)
 
-## 🔧 Instalasi
+### Langkah Jalankan Aplikasi
 
-### 1. API (Laravel)
+#### 1. Persiapan Redis
+Pastikan layanan Redis sudah berjalan:
+```bash
+brew services start redis  # Untuk MacOS
+```
+
+#### 2. Menjalankan Backend (Laravel)
 ```bash
 cd api
 composer install
@@ -56,42 +62,31 @@ php artisan migrate --seed
 php artisan serve --port=8000
 ```
 
-### 2. SFU (Media Server)
+#### 3. Menjalankan Media Server (SFU)
 ```bash
 cd sfu
 npm install
-# Pastikan build tools sudah terinstall untuk mediasoup
 npm start
 ```
 
-### 3. Client (React)
+#### 4. Menjalankan Frontend (Client)
 ```bash
 cd client
 npm install
 npm run dev
 ```
 
-## 🔒 Keamanan
+Akses aplikasi melalui: `http://localhost:5173`
 
-- **Autentikasi JWT**: Akses signaling yang aman.
-- **Penandatanganan RS256**: Laravel menandatangani token, SFU memverifikasi dengan kunci publik.
-- **DTLS-SRTP**: Aliran media yang terenkripsi penuh.
+## 🔒 Keamanan & Privasi
+
+- **Autentikasi Ganda**: Menggunakan JWT untuk sesi aplikasi dan Token Media terenkripsi untuk akses SFU.
+- **RS256 Signing**: Verifikasi token menggunakan kunci publik/privat antara Laravel dan SFU.
+- **Enkripsi Media**: Seluruh aliran media menggunakan DTLS-SRTP untuk enkripsi end-to-end dalam transit.
 
 ## 📄 Lisensi
 
 Proprietary / Enterprise.
 
 ---
-Dibuat dengan ❤️ untuk Komunikasi Performa Tinggi.
-
-brew services start redis
-
-cd /Applications/MAMP/htdocs/SignalCore/api
-php artisan serve --port=8000
-
-
-cd /Applications/MAMP/htdocs/SignalCore/sfu
-npm start
-
-cd /Applications/MAMP/htdocs/SignalCore/client
-npm run dev
+Dibuat dengan ❤️ untuk Komunikasi Performa Tinggi oleh **SignalCore Team**.

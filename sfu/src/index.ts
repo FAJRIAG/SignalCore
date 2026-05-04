@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import fs from 'fs';
 import path from 'path';
 import { createClient } from 'redis';
+import { startRecording, stopRecording } from './recording';
 import { 
     createMediasoupWorkers, 
     createRoomRouter, 
@@ -14,7 +15,9 @@ import {
     routers,
     transports,
     producers,
-    consumers
+    consumers,
+    sfuEvents,
+    getCpuUsage
 } from './mediasoup';
 
 const app = express();
@@ -164,7 +167,7 @@ wss.on('connection', (ws: any, req) => {
                         // Notify client to remove this peer's track
                         ws.send(JSON.stringify({ 
                             type: 'producerClosed', 
-                            payload: { userId: peerId, producerId, kind: consumer.kind === 'video' ? 'camera' : (consumer.kind === 'audio' ? 'audio' : 'screen') } 
+                            payload: { socketId: peerId, producerId, kind: consumer.kind === 'video' ? 'camera' : (consumer.kind === 'audio' ? 'audio' : 'screen') } 
                         }));
                         consumer.close();
                         consumers.delete(consumer.id);
@@ -219,7 +222,7 @@ wss.on('connection', (ws: any, req) => {
                         // Notify others
                         broadcastToRoom(roomId, {
                             type: 'producerClosed',
-                            payload: { userId, producerId, kind }
+                            payload: { socketId, userId, producerId, kind }
                         }, ws);
                     }
                     break;
@@ -247,6 +250,24 @@ wss.on('connection', (ws: any, req) => {
                         type: 'whiteboardToggle',
                         payload: { userId, isOpen }
                     }, ws);
+                    break;
+                }
+
+                case 'startRecording': {
+                    try {
+                        const result = await startRecording(roomId);
+                        broadcastToRoom(roomId, { type: 'recordingStarted' }, null as any);
+                    } catch (err: any) {
+                        ws.send(JSON.stringify({ type: 'error', payload: err.message }));
+                    }
+                    break;
+                }
+
+                case 'stopRecording': {
+                    const result = stopRecording(roomId);
+                    if (result.success) {
+                        broadcastToRoom(roomId, { type: 'recordingStopped' }, null as any);
+                    }
                     break;
                 }
             }
@@ -324,13 +345,22 @@ async function start() {
             await createRoomRouter(data.room_id);
         }
     });
+
+    sfuEvents.on('activeSpeakers', ({ roomId, activeSpeakers }) => {
+        // Broadcast active speakers to room
+        broadcastToRoom(roomId, {
+            type: 'activeSpeakers',
+            payload: { activeSpeakers }
+        }, null as any); // broadcast to all
+    });
+    
     
     // Periodically update Node metrics to Redis
     setInterval(async () => {
         try {
             await pubClient.set(`signalcore:node:${NODE_ID}:metrics`, JSON.stringify({
                 node_id: NODE_ID,
-                cpu_usage: Math.round(Math.random() * 20), // Placeholder CPU
+                cpu_usage: getCpuUsage(),
                 active_transports: Object.keys(transports).length, // Need correct count
                 timestamp: Date.now()
             }));

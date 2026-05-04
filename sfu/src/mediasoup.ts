@@ -1,6 +1,9 @@
 import * as mediasoup from 'mediasoup';
 import os from 'os';
 import { RedisClientType } from 'redis';
+import { EventEmitter } from 'events';
+
+export const sfuEvents = new EventEmitter();
 
 function getLocalIp() {
     if (process.env.ANNOUNCED_IP) {
@@ -29,6 +32,8 @@ export const transports: Map<string, mediasoup.types.WebRtcTransport> = new Map(
 export const producers: Map<string, mediasoup.types.Producer> = new Map();
 // Consumers: consumerId -> Consumer
 export const consumers: Map<string, mediasoup.types.Consumer> = new Map();
+// AudioLevelObservers: roomId -> AudioLevelObserver
+export const observers: Map<string, mediasoup.types.AudioLevelObserver> = new Map();
 
 export async function createMediasoupWorkers() {
     const numWorkers = Object.keys(os.cpus()).length;
@@ -89,7 +94,29 @@ export async function createRoomRouter(roomId: string) {
                     }
                 ]
             });
+
+            // Create AudioLevelObserver for Active Speaker Detection
+            const audioLevelObserver = await router.createAudioLevelObserver({
+                maxEntries: 1,
+                threshold: -80,
+                interval: 800
+            });
+
+            audioLevelObserver.on('volumes', (volumes) => {
+                const activeSpeakers = volumes.map(v => {
+                    const producer = producers.get(v.producer.id);
+                    return producer ? producer.appData.socketId : null;
+                }).filter(Boolean);
+                
+                sfuEvents.emit('activeSpeakers', { roomId, activeSpeakers });
+            });
+
+            audioLevelObserver.on('silence', () => {
+                sfuEvents.emit('activeSpeakers', { roomId, activeSpeakers: [] });
+            });
+
             routers.set(roomId, router);
+            observers.set(roomId, audioLevelObserver);
             return router;
         } finally {
             // Cleanup promise once done
@@ -114,7 +141,7 @@ export async function createWebRtcTransport(roomId: string) {
         ],
         enableUdp: true,
         enableTcp: true,
-        preferUdp: true,
+        preferTcp: true, // Prefer TCP to bypass strict NAT/Firewalls
         initialAvailableOutgoingBitrate: 1000000,
     });
 
@@ -159,6 +186,13 @@ export async function produce(transportId: string, kind: any, rtpParameters: any
     const producer = await transport.produce({ kind, rtpParameters, appData });
     producers.set(producer.id, producer);
 
+    if (kind === 'audio' && appData.roomId) {
+        const observer = observers.get(appData.roomId);
+        if (observer) {
+            observer.addProducer({ producerId: producer.id }).catch(console.error);
+        }
+    }
+
     producer.on('transportclose', () => {
         producer.close();
         producers.delete(producer.id);
@@ -172,4 +206,12 @@ export async function resumeConsumer(consumerId: string) {
     const consumer = consumers.get(consumerId);
     if (!consumer) throw new Error(`Consumer ${consumerId} not found`);
     await consumer.resume();
+}
+
+export function getCpuUsage(): number {
+    const cpus = os.cpus().length;
+    // os.loadavg()[0] is 1 minute load avg
+    const load = os.loadavg()[0] || 0;
+    const usage = Math.min(100, Math.round((load / cpus) * 100));
+    return usage;
 }

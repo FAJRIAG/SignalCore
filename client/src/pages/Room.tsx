@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Device, types } from 'mediasoup-client';
 import { useRoomStore } from '../store/useRoomStore';
 import { VideoGrid } from '../components/VideoGrid';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Link2, Check, Monitor, Edit3 } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Link2, Check, Monitor, Edit3, Disc } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Whiteboard } from '../components/Whiteboard';
 
@@ -22,10 +22,12 @@ export default function Room() {
         setConnected, 
         addPeer, 
         removePeer, 
+        removePeerTrack,
         clearPeers, 
         setPeerMediaState,
         isWhiteboardOpen,
         setIsWhiteboardOpen,
+        setActiveSpeakers,
         clearRoom
     } = useRoomStore();
     const navigate = useNavigate();
@@ -49,6 +51,8 @@ export default function Room() {
     const [localSocketId, setLocalSocketId] = useState<string | null>(null);
     const localSocketIdRef = useRef<string | null>(null);
     const [duration, setDuration] = useState('00:00');
+    const [isRecording, setIsRecording] = useState(false);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     
     // Calculate start time based on room creation
     const startTimeRef = useRef(roomCreatedAt ? new Date(roomCreatedAt).getTime() : Date.now());
@@ -251,7 +255,7 @@ export default function Room() {
                 case 'producerClosed': {
                     const { socketId: closedSocketId, kind } = payload;
                     console.info(`[ROOM] Producer closed: ${kind} from ${closedSocketId}`);
-                    addPeer(closedSocketId, '', kind, null); // userId placeholder as we have socketId
+                    removePeerTrack(closedSocketId, kind);
                     break;
                 }
 
@@ -264,6 +268,11 @@ export default function Room() {
                     if (type === 'whiteboardToggle') {
                         setIsWhiteboardOpen(payload.isOpen);
                     }
+                    break;
+                }
+
+                case 'activeSpeakers': {
+                    setActiveSpeakers(payload.activeSpeakers);
                     break;
                 }
             }
@@ -418,6 +427,52 @@ export default function Room() {
         }
     }
 
+    const startClientRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ 
+                video: { displaySurface: "browser" } as any, 
+                audio: true 
+            });
+            const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+            const chunks: BlobPart[] = [];
+            
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) chunks.push(e.data);
+            };
+            
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `SignalCore-Recording-${new Date().toISOString()}.webm`;
+                a.click();
+                URL.revokeObjectURL(url);
+                setIsRecording(false);
+                mediaRecorderRef.current = null;
+            };
+            
+            recorder.start();
+            mediaRecorderRef.current = recorder;
+            setIsRecording(true);
+
+            // If user stops sharing via browser native UI 'Stop sharing' button
+            stream.getVideoTracks()[0].onended = () => {
+                if (recorder.state !== 'inactive') recorder.stop();
+            };
+        } catch (err) {
+            console.error("[RECORDING] Failed to start:", err);
+            setIsRecording(false);
+        }
+    };
+
+    const stopClientRecording = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+            mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
+        }
+    };
+
     return (
         <div className="flex flex-col h-screen bg-gray-950 text-white font-sans">
             {/* Header with Clock */}
@@ -543,6 +598,19 @@ export default function Room() {
                     title="Whiteboard"
                 >
                     <Edit3 className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
+                <button 
+                    onClick={() => {
+                        if (isRecording) {
+                            stopClientRecording();
+                        } else {
+                            startClientRecording();
+                        }
+                    }}
+                    className={`p-3 sm:p-4 rounded-full transition-all duration-200 ${isRecording ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse shadow-lg shadow-red-900/50' : 'bg-gray-800 hover:bg-gray-700 text-white'}`}
+                    title={isRecording ? "Stop Recording & Save" : "Record Meeting"}
+                >
+                    <Disc className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
                 <button 
                     className="p-3 sm:p-4 rounded-full bg-red-600 hover:bg-red-700 text-white transition-all duration-200 shadow-lg shadow-red-900/20" 

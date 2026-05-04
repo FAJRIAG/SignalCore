@@ -46,24 +46,26 @@ const VideoElement = ({ track, audioTrack, muted = false, label, micMuted = fals
 
   return (
     <div className={`overflow-hidden flex items-center justify-center relative ${isScreenShare ? 'w-full h-full bg-transparent' : 'bg-gray-800 rounded-lg shadow-lg aspect-video w-full'}`}>
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted={muted}
-        className={`w-full h-full ${isScreenShare ? 'object-contain' : 'object-cover'}`}
-      />
+      {track && (
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted={muted}
+            className={`w-full h-full ${isScreenShare ? 'object-contain' : 'object-cover'} absolute inset-0 z-0`}
+          />
+      )}
 
       {/* Remote audio — rendered separately to avoid mute conflict with video element */}
       {audioTrack && <AudioElement track={audioTrack} />}
 
       {/* No video avatar */}
       {!track && (
-        <div className="text-gray-400 absolute flex flex-col items-center">
-          <div className="w-16 h-16 rounded-full bg-gray-700 flex items-center justify-center text-xl font-bold mb-2">
+        <div className="text-gray-400 absolute flex flex-col items-center z-10">
+          <div className="w-16 h-16 rounded-full bg-gray-700 flex items-center justify-center text-xl font-bold mb-2 shadow-inner">
             {label ? label[0].toUpperCase() : 'U'}
           </div>
-          <span className="text-sm">No Video</span>
+          <span className="text-sm font-medium">No Video</span>
         </div>
       )}
 
@@ -95,14 +97,23 @@ interface VideoGridProps {
 }
 
 export const VideoGrid = ({ localVideoTrack, localScreenTrack, localSocketId, localMicOn = true }: VideoGridProps) => {
-  const { peers } = useRoomStore();
+  const { peers, activeSpeakers } = useRoomStore();
 
   const remotePeers = Object.entries(peers).filter(([id]) => id !== localSocketId);
 
+  // Active Speaker Detection: Limit rendered videos to save CPU
+  const MAX_VISIBLE_VIDEOS = 6;
+  const sortedPeers = [...remotePeers].sort((a, b) => {
+      const aActive = activeSpeakers.includes(a[0]) ? 1 : 0;
+      const bActive = activeSpeakers.includes(b[0]) ? 1 : 0;
+      return bActive - aActive; // Descending
+  });
+
+  const topPeers = sortedPeers.slice(0, MAX_VISIBLE_VIDEOS);
+  const forcedOffCamPeers = sortedPeers.slice(MAX_VISIBLE_VIDEOS);
+
   const localHasVideo  = !!localVideoTrack;
   const localHasScreen = !!localScreenTrack;
-  const remoteOnCam    = remotePeers.filter(([, p]) => p.video && !p.videoMuted);
-  const remoteOffCam   = remotePeers.filter(([, p]) => !p.video || p.videoMuted);
   
   // Find who is sharing screen (prioritize remote screens)
   const remoteSharer = remotePeers.find(([, p]) => p.screen);
@@ -142,63 +153,47 @@ export const VideoGrid = ({ localVideoTrack, localScreenTrack, localSocketId, lo
              <VideoElement track={localVideoTrack} muted label="You" micMuted={!localMicOn} />
           </div>
           {/* Remote Cameras */}
-          {remotePeers.map(([uid, peer]) => (
+          {sortedPeers.map(([uid, peer], idx) => {
+            const isForcedOff = idx >= MAX_VISIBLE_VIDEOS;
+            return (
             <div key={uid} className="h-full aspect-video flex-shrink-0">
               <VideoElement 
-                track={peer.video ?? null} 
+                track={isForcedOff ? null : (peer.video ?? null)} 
                 audioTrack={peer.audio ?? null} 
                 label={peer.name || `User ${peer.userId || uid}`} 
                 micMuted={peer.audioMuted} 
               />
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
   }
 
-  // ── STANDARD GRID LAYOUT (Existing logic) ─────────────────────────────────
-  const anyoneHasCam = localHasVideo || remoteOnCam.length > 0;
-
-  if (!anyoneHasCam) {
-    const total = 1 + remotePeers.length;
-    const flatClass = getResponsiveClass(total);
-
-    return (
-      <div className="w-full h-full bg-gray-900 flex items-center justify-center overflow-y-auto">
-        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 p-2 sm:p-4 w-full max-w-6xl">
-          <div className={flatClass}>
-            <VideoElement track={null} muted label="You" micMuted={!localMicOn} />
-          </div>
-          {remotePeers.map(([uid, peer]) => (
-            <div key={uid} className={flatClass}>
-              <VideoElement track={null} audioTrack={peer.audio ?? null} label={`User ${peer.userId || uid}`} micMuted={peer.audioMuted} />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  const mainCount = (localHasVideo ? 1 : 0) + remoteOnCam.length;
+  // ── STANDARD GRID LAYOUT (Google Meet Style) ──────────────────────────────
+  const mainCount = 1 + topPeers.length;
   const mainClass = getResponsiveClass(mainCount);
-  const hasBottom = !localHasVideo || remoteOffCam.length > 0;
+  const hasBottom = forcedOffCamPeers.length > 0;
 
   return (
     <div className="w-full h-full bg-gray-900 flex flex-col">
       <div className="flex-1 flex items-center justify-center overflow-y-auto">
         <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 px-2 sm:px-4 w-full max-w-6xl">
-          {localHasVideo && (
-            <div className={mainClass}>
-              <VideoElement track={localVideoTrack} muted label="You" micMuted={!localMicOn} />
-            </div>
-          )}
-          {remoteOnCam.map(([uid, peer]) => (
+          <div className={mainClass}>
+            <VideoElement 
+              track={localHasVideo ? localVideoTrack : null} 
+              muted 
+              label="You" 
+              micMuted={!localMicOn} 
+            />
+          </div>
+          {topPeers.map(([uid, peer]) => (
             <div key={uid} className={mainClass}>
               <VideoElement
-                track={peer.video ?? null}
+                track={(!peer.video || peer.videoMuted) ? null : peer.video}
                 audioTrack={peer.audio ?? null}
-                label={`User ${peer.userId || uid}`}
+                label={peer.name || `User ${peer.userId || uid}`}
                 micMuted={peer.audioMuted}
               />
             </div>
@@ -208,12 +203,7 @@ export const VideoGrid = ({ localVideoTrack, localScreenTrack, localSocketId, lo
 
       {hasBottom && (
         <div className="flex flex-nowrap items-center justify-start sm:justify-center gap-2 sm:gap-3 p-2 sm:p-4 flex-shrink-0 overflow-x-auto w-full custom-scrollbar">
-          {!localHasVideo && (
-            <div className="w-24 sm:w-36 flex-shrink-0">
-              <VideoElement track={null} muted label="You" micMuted={!localMicOn} />
-            </div>
-          )}
-          {remoteOffCam.map(([uid, peer]) => (
+          {forcedOffCamPeers.map(([uid, peer]) => (
             <div key={uid} className="w-24 sm:w-36 flex-shrink-0">
               <VideoElement track={null} audioTrack={peer.audio ?? null} label={`User ${peer.userId || uid}`} micMuted={peer.audioMuted} />
             </div>

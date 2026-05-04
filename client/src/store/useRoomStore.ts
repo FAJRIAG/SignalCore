@@ -15,11 +15,13 @@ interface RoomState {
   setConnected: (status: boolean) => void;
   addPeer: (socketId: string, userId: string, kind: string, track: any) => void;
   removePeer: (socketId: string) => void;
+  removePeerTrack: (socketId: string, kind: string) => void;
   clearPeers: () => void;
   clearRoom: () => void;
   setPeerMediaState: (socketId: string, kind: 'video' | 'audio', isMuted: boolean) => void;
   isWhiteboardOpen: boolean;
   setIsWhiteboardOpen: (isOpen: boolean) => void;
+  setActiveSpeakers: (speakers: string[]) => void;
 }
 
 export const useRoomStore = create<RoomState>((set) => ({
@@ -71,6 +73,17 @@ export const useRoomStore = create<RoomState>((set) => ({
     delete peers[socketId];
     return { peers };
   }),
+  removePeerTrack: (socketId, kind) => set((state) => {
+    const peers = { ...state.peers };
+    if (peers[socketId]) {
+        const peer = { ...peers[socketId] };
+        if (kind === 'video' || kind === 'camera') peer.video = null;
+        if (kind === 'audio' || kind === 'mic') peer.audio = null;
+        if (kind === 'screen') peer.screen = null;
+        peers[socketId] = peer;
+    }
+    return { peers };
+  }),
   clearPeers: () => set({ peers: {} }),
   clearRoom: () => {
     localStorage.removeItem('roomId');
@@ -91,4 +104,5 @@ export const useRoomStore = create<RoomState>((set) => ({
   }),
   isWhiteboardOpen: false,
   setIsWhiteboardOpen: (isOpen) => set({ isWhiteboardOpen: isOpen }),
+  setActiveSpeakers: (speakers) => set({ activeSpeakers: speakers }),
 }));

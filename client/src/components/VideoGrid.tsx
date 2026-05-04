@@ -90,14 +90,14 @@ const VideoElement = ({ track, audioTrack, muted = false, label, micMuted = fals
 interface VideoGridProps {
   localVideoTrack?: MediaStreamTrack | null;
   localScreenTrack?: MediaStreamTrack | null;
-  localUserId?: string;
+  localSocketId?: string | null;
   localMicOn?: boolean;
 }
 
-export const VideoGrid = ({ localVideoTrack, localScreenTrack, localUserId, localMicOn = true }: VideoGridProps) => {
+export const VideoGrid = ({ localVideoTrack, localScreenTrack, localSocketId, localMicOn = true }: VideoGridProps) => {
   const { peers } = useRoomStore();
 
-  const remotePeers = Object.entries(peers).filter(([id]) => id !== localUserId);
+  const remotePeers = Object.entries(peers).filter(([id]) => id !== localSocketId);
 
   const localHasVideo  = !!localVideoTrack;
   const localHasScreen = !!localScreenTrack;
@@ -147,7 +147,7 @@ export const VideoGrid = ({ localVideoTrack, localScreenTrack, localUserId, loca
               <VideoElement 
                 track={peer.video ?? null} 
                 audioTrack={peer.audio ?? null} 
-                label={peer.name || `User ${uid}`} 
+                label={peer.name || `User ${peer.userId || uid}`} 
                 micMuted={peer.audioMuted} 
               />
             </div>
@@ -172,7 +172,7 @@ export const VideoGrid = ({ localVideoTrack, localScreenTrack, localUserId, loca
           </div>
           {remotePeers.map(([uid, peer]) => (
             <div key={uid} className={flatClass}>
-              <VideoElement track={null} audioTrack={peer.audio ?? null} label={`User ${uid}`} micMuted={peer.audioMuted} />
+              <VideoElement track={null} audioTrack={peer.audio ?? null} label={`User ${peer.userId || uid}`} micMuted={peer.audioMuted} />
             </div>
           ))}
         </div>
@@ -198,7 +198,7 @@ export const VideoGrid = ({ localVideoTrack, localScreenTrack, localUserId, loca
               <VideoElement
                 track={peer.video ?? null}
                 audioTrack={peer.audio ?? null}
-                label={`User ${uid}`}
+                label={`User ${peer.userId || uid}`}
                 micMuted={peer.audioMuted}
               />
             </div>
@@ -215,7 +215,7 @@ export const VideoGrid = ({ localVideoTrack, localScreenTrack, localUserId, loca
           )}
           {remoteOffCam.map(([uid, peer]) => (
             <div key={uid} className="w-24 sm:w-36 flex-shrink-0">
-              <VideoElement track={null} audioTrack={peer.audio ?? null} label={`User ${uid}`} micMuted={peer.audioMuted} />
+              <VideoElement track={null} audioTrack={peer.audio ?? null} label={`User ${peer.userId || uid}`} micMuted={peer.audioMuted} />
             </div>
           ))}
         </div>

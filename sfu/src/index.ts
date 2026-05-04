@@ -33,9 +33,11 @@ const jwtPublicKey = fs.readFileSync(jwtPublicKeyPath, 'utf8');
 // Maps to keep track of sockets
 const roomPeers: Record<string, Set<WebSocket>> = {};
 
-wss.on('connection', (ws: WebSocket, req) => {
+wss.on('connection', (ws: any, req) => {
     let roomId = '';
     let userId = 0;
+    const socketId = Math.random().toString(36).substring(2, 15);
+    ws.socketId = socketId;
     
     ws.on('message', async (message: string) => {
         try {
@@ -50,7 +52,7 @@ wss.on('connection', (ws: WebSocket, req) => {
                         const decoded: any = jwt.verify(token, jwtPublicKey, { algorithms: ['RS256'] });
                         roomId = decoded.roomId;
                         userId = decoded.userId;
-                        console.log(`[AUTH] success! User:${userId}, Room:${roomId}`);
+                        console.log(`[AUTH] success! User:${userId}, Room:${roomId}, Socket:${socketId}`);
 
                         if (!roomPeers[roomId]) roomPeers[roomId] = new Set();
                         roomPeers[roomId]!.add(ws);
@@ -63,10 +65,11 @@ wss.on('connection', (ws: WebSocket, req) => {
                         // Find existing producers in this room
                         const existingProducers = [];
                         for (const producer of producers.values()) {
-                            if (producer.appData.roomId === roomId && producer.appData.userId !== userId) {
+                            if (producer.appData.roomId === roomId && producer.appData.socketId !== socketId) {
                                 existingProducers.push({
                                     producerId: producer.id,
                                     userId: producer.appData.userId,
+                                    socketId: producer.appData.socketId,
                                     kind: producer.kind,
                                     appData: producer.appData
                                 });
@@ -76,6 +79,7 @@ wss.on('connection', (ws: WebSocket, req) => {
                         ws.send(JSON.stringify({ 
                             type: 'auth_success', 
                             payload: { 
+                                socketId,
                                 routerRtpCapabilities: routers.get(roomId)!.rtpCapabilities,
                                 existingProducers
                             } 
@@ -93,7 +97,7 @@ wss.on('connection', (ws: WebSocket, req) => {
                     console.log(`[TRANSPORT] Creating ${direction} transport for User:${userId} in Room:${roomId}`);
                     const transportInfo = await createWebRtcTransport(roomId);
                     const transport = transports.get(transportInfo.id);
-                    if (transport) transport.appData = { roomId, userId, direction };
+                    if (transport) transport.appData = { roomId, userId, socketId, direction };
 
                     console.log(`[TRANSPORT] Sending transportInfo id=${transportInfo.id}, direction=${direction}`);
                     ws.send(JSON.stringify({ 
@@ -115,13 +119,13 @@ wss.on('connection', (ws: WebSocket, req) => {
                     const { transportId, kind, rtpParameters, appData: clientAppData } = payload;
                     const source = clientAppData?.source || 'camera';
                     console.log(`[PRODUCE] User:${userId} producing ${kind} (${source}) on transport:${transportId}`);
-                    const producerId = await produce(transportId, kind, rtpParameters, { userId, roomId, ...clientAppData });
+                    const producerId = await produce(transportId, kind, rtpParameters, { userId, roomId, socketId, ...clientAppData });
                     ws.send(JSON.stringify({ type: 'produced', payload: { id: producerId } }));
                     
                     // Broadcast new producer to room
                     broadcastToRoom(roomId, {
                         type: 'newProducer',
-                        payload: { producerId, userId, kind, appData: { userId, roomId, ...clientAppData } }
+                        payload: { producerId, userId, socketId, kind, appData: { userId, roomId, socketId, ...clientAppData } }
                     }, ws);
                     break;
                 }
@@ -144,6 +148,8 @@ wss.on('connection', (ws: WebSocket, req) => {
                         rtpCapabilities,
                         paused: true
                     });
+
+                    (consumer as any).appData = { socketId, userId, roomId };
 
                     consumers.set(consumer.id, consumer);
 
@@ -172,7 +178,8 @@ wss.on('connection', (ws: WebSocket, req) => {
                             producerId,
                             kind: consumer.kind,
                             rtpParameters: consumer.rtpParameters,
-                            peerId,
+                            peerId: peerId, // This is now socketId
+                            userId: producers.get(producerId)?.appData.userId,
                             appData: producers.get(producerId)?.appData
                         }
                     }));
@@ -259,7 +266,7 @@ wss.on('connection', (ws: WebSocket, req) => {
             if (userId) {
                 broadcastToRoom(roomId, {
                     type: 'peerLeft',
-                    payload: { userId }
+                    payload: { userId, socketId }
                 }, ws);
             }
 
@@ -268,9 +275,17 @@ wss.on('connection', (ws: WebSocket, req) => {
             }
         }
 
+        // Cleanup transports owned by this peer
+        for (const [id, transport] of transports.entries()) {
+            if (transport.appData?.socketId === socketId && transport.appData?.roomId === roomId) {
+                transport.close();
+                transports.delete(id);
+            }
+        }
+
         // Cleanup producers owned by this peer
         for (const [id, producer] of producers.entries()) {
-            if (producer.appData?.userId === userId && producer.appData?.roomId === roomId) {
+            if (producer.appData?.socketId === socketId && producer.appData?.roomId === roomId) {
                 producer.close();
                 producers.delete(id);
             }
@@ -278,7 +293,7 @@ wss.on('connection', (ws: WebSocket, req) => {
 
         // Cleanup consumers owned by this peer
         for (const [id, consumer] of consumers.entries()) {
-            if ((consumer as any).appData?.userId === userId) {
+            if ((consumer as any).appData?.socketId === socketId) {
                 consumer.close();
                 consumers.delete(id);
             }

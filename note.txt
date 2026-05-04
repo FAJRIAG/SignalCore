@@ -1,0 +1,368 @@
+================================================================
+  SIGNALCORE — RENCANA BISNIS STARTUP
+  Platform Video Conferencing Enterprise Self-Hosted
+================================================================
+
+================================================================
+1. IDE BISNIS STARTUP
+================================================================
+
+APA ITU SIGNALCORE?
+-------------------
+SignalCore adalah platform Video Conferencing berbasis self-hosted
+yang memungkinkan perusahaan, institusi, dan pemerintah menjalankan
+infrastruktur komunikasi video mereka sendiri — tanpa ketergantungan
+pada Zoom, Google Meet, atau Microsoft Teams.
+
+MASALAH YANG DISELESAIKAN:
+---------------------------
+- Zoom Enterprise = $250/user/tahun (100 user = Rp 390 juta/tahun)
+- Data rapat keluar ke server luar negeri (melanggar UU PDP 2022)
+- Tidak bisa dikustomisasi untuk kebutuhan internal perusahaan
+- Performa drop saat user > 50 (arsitektur mesh biasa tidak mampu)
+- Tidak ada solusi lokal sekelas Zoom di Indonesia
+
+SOLUSI SIGNALCORE:
+------------------
+- Self-Hosted: data tidak pernah keluar dari server klien
+- SFU Mediasoup: support 100+ user, latensi < 300ms
+- JWT RS256: keamanan enterprise-grade
+- Redis load balancing: pilih node paling ringan otomatis
+- Whiteboard kolaboratif real-time (sudah ada di codebase)
+- Screen sharing (sudah ada di codebase)
+- Grid adaptif sesuai jumlah peserta aktif
+
+TARGET PASAR:
+-------------
+1. Institusi Pendidikan (4.500+ kampus swasta — ENTRY POINT)
+   - Rata-rata bayar Zoom Rp 15–50 juta/tahun
+   - Keputusan lebih cepat, tidak perlu tender panjang
+   - Pitch: "Hemat 70%, data di server kampus sendiri"
+
+2. Klinik & Telemedicine
+   - PERMENKES No.20/2019 wajibkan enkripsi data pasien
+   - Pitch: "Konsultasi dokter-pasien yang benar-benar privat"
+
+3. Pemerintah Daerah & BUMN
+   - Inpres digitalisasi 2024 + anggaran Rp 27,3 triliun
+   - UU PDPRI 2022 dorong kedaulatan data
+   - Pitch: "Rapat dinas berdaulat, sesuai regulasi nasional"
+
+4. Developer / API (jangka panjang)
+   - Jual SignalCore sebagai Video API terintegrasi
+   - Model: pay-per-minute seperti Twilio tapi lebih murah
+
+MODEL REVENUE:
+--------------
+Tier 1 - STARTER (Kampus kecil / Klinik)
+  Setup Fee    : Rp 8–15 juta (satu kali)
+  Support      : Rp 1.5–3 juta/tahun
+
+Tier 2 - PROFESSIONAL (Kampus besar / RS Swasta)
+  Setup Fee    : Rp 25–50 juta
+  Support      : Rp 5–10 juta/tahun
+  White-label  : +Rp 15 juta (logo custom)
+
+Tier 3 - ENTERPRISE (BUMN / Pemda)
+  Setup Fee    : Rp 75–200 juta
+  Support SLA  : Rp 20–50 juta/tahun
+  Integrasi SSO: +Rp 20 juta
+
+Tier 4 - API Developer
+  Pay-per-min  : Rp 75/menit/koneksi
+  Min. bulanan : Rp 500 ribu
+
+PROYEKSI REVENUE TAHUN PERTAMA:
+--------------------------------
+Bulan 1-3   : 2 klien Tier 1        → Rp  25 juta
+Bulan 4-6   : +3 klien Tier 1-2     → Rp  80 juta
+Bulan 7-9   : +3 klien mix          → Rp 220 juta
+Bulan 10-12 : +5 klien mix          → Rp 400 juta
+Total       : ~13 klien             → Rp 725 juta
+
+
+================================================================
+2. MEREALISASIKAN IDE
+================================================================
+
+STATUS TEKNIS SAAT INI (SUDAH ADA DI CODEBASE):
+-------------------------------------------------
+[x] Auth register/login dengan Laravel Sanctum
+[x] Room create / join / leave
+[x] SFU Mediasoup multi-worker
+[x] Redis pub/sub + load balancing node
+[x] Screen share real-time
+[x] Whiteboard kolaboratif
+[x] Adaptive video grid
+
+BUG KRITIS YANG HARUS DIPERBAIKI SEBELUM JUALAN:
+-------------------------------------------------
+BUG 1 — sfu/src/index.ts baris 333
+  SEKARANG (SALAH): cpu_usage: Math.round(Math.random() * 20)
+  SOLUSI: Gunakan os.cpuUsage() nyata dari Node.js
+
+BUG 2 — sfu/src/index.ts baris 334
+  SEKARANG (SALAH): Object.keys(transports).length
+  SOLUSI: transports.size  (transports adalah Map, bukan Object)
+
+BUG 3 — api/.env
+  SEKARANG: DB_CONNECTION=sqlite
+  SOLUSI: Ganti ke MySQL untuk production
+
+ROADMAP PENGEMBANGAN:
+---------------------
+FASE 1 - Stabilisasi MVP (Minggu 1-4)
+  [ ] Fix 3 bug kritis di atas
+  [ ] Test load 20+ user
+  [ ] Buat landing page
+  [ ] Dokumentasi deploy untuk IT klien
+
+FASE 2 - Feature untuk Jualan (Bulan 2-3)
+  [ ] Admin dashboard (monitoring room, CPU, user aktif)
+  [ ] Recording room
+  [ ] Host controls: mute-all, kick participant
+  [ ] Waiting room & admit system
+  [ ] In-call text chat
+
+FASE 3 - Enterprise Ready (Bulan 4-6)
+  [ ] Multi-tenant (isolasi data per organisasi)
+  [ ] SSO / LDAP integration
+  [ ] Multi SFU node (horizontal scaling)
+  [ ] Coturn TURN server
+  [ ] REST API publik
+  [ ] Audit log aktivitas room
+
+TIM YANG DIBUTUHKAN:
+--------------------
+Founder/CTO (kamu)        → Sekarang
+Backend Dev (Node.js/SFU) → Bulan 1  (Rp 7-12 juta/bln)
+Frontend Dev (React)      → Bulan 2  (Rp 5-8 juta/bln)
+DevOps/Linux              → Bulan 2  (Rp 5-8 juta/bln)
+Business Dev / Sales      → Bulan 3  (Rp 5-8 juta + komisi)
+
+TIP: Mulai dengan freelancer untuk bug fixing & dashboard.
+     Hire full-time setelah dapat klien pertama.
+
+
+================================================================
+3. MENENTUKAN CARA PERMODALAN
+================================================================
+
+STRATEGI BERTAHAP (DARI YANG PALING MUDAH):
+
+--------------------------------------------
+TAHAP 1 — BOOTSTRAPPING (Modal Rp 3-6 juta)
+--------------------------------------------
+Langkah konkret:
+1. List 20 universitas swasta di kotamu (web dikti.kemdikbud.go.id)
+2. Cari nama Kepala IT / Wakil Rektor di LinkedIn
+3. Tawarkan pilot gratis 1 bulan (20 user)
+4. Setelah pilot: proposal setup fee Rp 8-15 juta
+5. Revenue klien 1 → biaya operasional klien berikutnya
+
+Target: 2 klien dalam 60 hari → Rp 20-30 juta cash masuk
+
+Kebutuhan awal:
+- Server VPS (2 core, 4GB)   : Rp 300-500rb/bulan
+- Domain + SSL + Email bisnis : Rp 1-2 juta
+- Legal (PT Perorangan)       : Rp 1-2 juta
+- Marketing awal              : Rp 500rb
+TOTAL: Rp 3-6 juta
+
+-------------------------------------------------
+TAHAP 2 — NON-DILUTIF / GRATIS (Tanpa Jual Saham)
+-------------------------------------------------
+A. AWS Activate Founders
+   Daftar   : aws.amazon.com/activate
+   Benefit  : USD 1.000 – 100.000 cloud credit GRATIS
+   Proses   : 3-5 hari, langsung approve
+   Manfaat  : Hosting SFU node gratis 6-12 bulan
+   >> DAFTAR SEKARANG! Paling mudah dan cepat.
+
+B. Google for Startups Cloud Program
+   Benefit  : USD 200.000 cloud credit (2 tahun)
+   Daftar   : cloud.google.com/startup
+
+C. 1000 Startup Digital — Kominfo
+   Benefit  : Mentoring, networking, exposure investor
+   Daftar   : 1000startupdigital.id
+   Penting  : Dapat legitimasi & koneksi pemerintah
+
+D. BRIN (Badan Riset Inovasi Nasional)
+   Benefit  : Hibah Rp 100–500 juta
+   Judul    : "Platform Komunikasi Video Berdaulat Berbasis SFU
+               untuk Infrastruktur Digital Nasional"
+   Syarat   : Kemitraan dengan perguruan tinggi
+
+--------------------------------------------
+TAHAP 3 — ANGEL INVESTOR (Setelah Ada Traction)
+--------------------------------------------
+Kapan approach:
+- Sudah punya 3-5 klien berbayar
+- ARR minimal Rp 50-100 juta
+- Tim minimal 3 orang
+
+Target raise   : Rp 500 juta – 1 miliar
+Valuasi        : Rp 4-8 miliar (5-8x ARR untuk SaaS B2B)
+Dilusi         : 10-20%
+
+Dimana cari angel investor:
+- Angin.id            → marketplace investor startup Indonesia
+- East Ventures       → fokus early-stage Indonesia
+- Prasetia Dwidharma  → fokus B2B SaaS
+- MDI Ventures (Telkom) → SANGAT relevan untuk infrastruktur komunikasi
+- LinkedIn            → search "angel investor Indonesia", DM langsung
+
+Template pitch singkat:
+"SignalCore adalah self-hosted video conferencing untuk enterprise
+Indonesia. Kami menyelesaikan masalah ketergantungan pada Zoom
+dan kepatuhan UU PDP 2022. MVP sudah jalan, X klien berbayar,
+ARR Rp Y juta. Mencari Rp Z juta untuk ekspansi tim dan sertifikasi."
+
+--------------------------------------------
+TAHAP 4 — VENTURE CAPITAL (> 12 bulan)
+--------------------------------------------
+East Ventures    : USD 100rb–1M   (early stage Indonesia)
+Convergence      : USD 500rb–3M   (B2B SaaS Asia)
+Intudo Ventures  : USD 500rb–5M   (Indonesia focused)
+AC Ventures      : USD 1M–10M     (tech Indonesia)
+
+
+================================================================
+4. MEMBANGUN RELASI
+================================================================
+
+RELASI TEKNIS (Bangun Kredibilitas Online):
+-------------------------------------------
+1. Tulis artikel di Medium / dev.to:
+   - "Cara Bangun Video Conference 100 User dengan Mediasoup+Laravel"
+   - "Kenapa Indonesia Butuh Self-Hosted Video Call"
+   → Menarik CTO dan IT Manager yang sedang research solusi
+
+2. GitHub: Open-source modul whiteboard SignalCore
+   → Bangun kredibilitas tanpa expose core product
+
+3. Join komunitas WebRTC:
+   - mediasoup Discourse & Discord
+   - Jawab pertanyaan, jadi expert yang dikenal
+
+4. Buat demo video 3 menit, upload YouTube:
+   Judul: "SignalCore — Video Conference 50 User, Self-Hosted, Made in Indonesia"
+
+RELASI BISNIS (Akuisisi Klien Kampus):
+---------------------------------------
+Minggu 1 - Riset:
+  - List 20 kampus swasta dari dikti.kemdikbud.go.id
+  - Cari nama Kepala IT / Wakil Rektor di LinkedIn
+
+Minggu 2 - Outreach:
+  Template email:
+  "Halo Pak/Bu [Nama], kami mengembangkan platform video conference
+  khusus kampus Indonesia yang dapat dihosting di server kampus
+  sendiri, hemat 70% vs Zoom, dan data tidak keluar dari server
+  kampus. Boleh 15 menit untuk demo?"
+
+Minggu 3 - Demo:
+  - Tunjukkan multiple user join, screen share, whiteboard
+  - Tunjukkan perbandingan harga vs Zoom
+
+Minggu 4 - Proposal:
+  - Kirim proposal tertulis + pricing
+  - Tawarkan pilot 1 bulan gratis untuk 20 user
+
+RELASI PEMERINTAH:
+------------------
+1. BSSN (Badan Siber dan Sandi Negara)
+   - Hadir di event BSSN Cyber Security Forum
+   - Minta masuk ke direktori "Solusi Keamanan Terverifikasi BSSN"
+
+2. Kominfo / e-Katalog LKPP
+   - Daftar sebagai vendor di e-katalog LKPP
+   - Procurement pemerintah WAJIB pakai e-katalog
+   - Sekali masuk = semua Pemda se-Indonesia bisa beli langsung
+
+3. BRIN
+   - Ajukan proposal riset bersama universitas mitra
+   - Dapat hibah Rp 100-500 juta
+
+RELASI INVESTOR & EKOSISTEM:
+-----------------------------
+Bulan 1 - Online Presence:
+  [x] Buat company page LinkedIn SignalCore
+  [x] Buat akun Twitter/X — post progress update mingguan
+  [x] Daftar di Crunchbase sebagai startup
+
+Bulan 2 - Komunitas Startup:
+  [x] Daftar NEXTICORN (komunitas startup tech Indonesia)
+  [x] Hadir di acara Tech in Asia, Startup Weekend Indonesia
+  [x] Daftar 1000 Startup Digital Kominfo
+
+Bulan 3 - Targeted Outreach:
+  [x] Identifikasi 20 angel investor Indonesia di LinkedIn
+  [x] DM dengan pitch singkat (bukan langsung minta uang)
+  [x] Minta coffee chat / intro call 30 menit
+
+RELASI PARTNERSHIP STRATEGIS:
+------------------------------
+Telkomsigma / Telkom  → Distribusi ke klien enterprise mereka
+Metrodata             → Integrator IT terbesar RI (ratusan klien)
+Logitech / Poly       → Bundle hardware + SignalCore software
+APTISI                → Asosiasi 4.500+ kampus swasta
+Universitas Negeri    → Kerjasama riset + akses hibah BRIN
+
+
+================================================================
+TIMELINE EKSEKUSI 12 BULAN
+================================================================
+
+BULAN 1-2: FIX & DEPLOY
+  - Perbaiki 3 bug kritis
+  - Deploy ke VPS dengan domain resmi
+  - Buat landing page + demo video
+  - Apply AWS Activate (PRIORITAS!)
+
+BULAN 2-3: KLIEN PERTAMA
+  - Outreach 20 kampus swasta
+  - Target: 2 klien pilot berbayar
+  - Revenue target: Rp 25-30 juta
+
+BULAN 3-5: PRODUCT POLISH
+  - Admin dashboard & recording
+  - Host controls (mute-all, kick)
+  - Daftar 1000 Startup Digital
+
+BULAN 5-7: SCALE SALES
+  - Hire 1 Business Dev / Sales
+  - Target: 5-8 klien total
+  - Revenue target: Rp 150-200 juta
+  - Apply hibah BRIN
+
+BULAN 7-9: ENTERPRISE PUSH
+  - Daftar e-Katalog LKPP
+  - Approach BUMN & Pemda
+  - Revenue target: Rp 350 juta kumulatif
+
+BULAN 9-12: FUNDRAISING
+  - Pitch deck dengan traction nyata
+  - Pitch ke angel investor / VC
+  - Target raise: Rp 500 juta – 1 miliar
+  - Revenue run-rate: Rp 60-80 juta/bulan
+
+
+================================================================
+SATU LANGKAH YANG HARUS DILAKUKAN HARI INI
+================================================================
+
+1. Buka sfu/src/index.ts baris 334
+2. Ganti: Object.keys(transports).length
+   Jadi  : transports.size
+3. Deploy ke VPS
+4. Hubungi 5 kepala IT kampus swasta terdekat
+
+Satu klien pertama akan mengubah segalanya —
+dari project menjadi bisnis nyata.
+
+================================================================
+  Dibuat: 2026-05-04 | Project: SignalCore
+  Teknologi: Laravel + Node.js + Mediasoup + Redis + React
+================================================================

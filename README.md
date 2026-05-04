@@ -83,3 +83,15 @@ Proprietary / Enterprise.
 
 ---
 Dibuat dengan ❤️ untuk Komunikasi Performa Tinggi.
+
+brew services start redis
+
+cd /Applications/MAMP/htdocs/SignalCore/api
+php artisan serve --port=8000
+
+
+cd /Applications/MAMP/htdocs/SignalCore/sfu
+npm start
+
+cd /Applications/MAMP/htdocs/SignalCore/client
+npm run dev

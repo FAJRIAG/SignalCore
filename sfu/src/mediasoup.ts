@@ -2,6 +2,23 @@ import * as mediasoup from 'mediasoup';
 import os from 'os';
 import { RedisClientType } from 'redis';
 
+function getLocalIp() {
+    if (process.env.ANNOUNCED_IP) {
+        return process.env.ANNOUNCED_IP;
+    }
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+        const ifaces = interfaces[name];
+        if (!ifaces) continue;
+        for (const iface of ifaces) {
+            if ((iface.family === 'IPv4' || (iface.family as any) === 4) && !iface.internal) {
+                return iface.address;
+            }
+        }
+    }
+    return '127.0.0.1';
+}
+
 export let workers: mediasoup.types.Worker[] = [];
 export let nextMediasoupWorkerIdx = 0;
 // Room Routers: roomId -> Router
@@ -92,7 +109,7 @@ export async function createWebRtcTransport(roomId: string) {
         listenIps: [
             {
                 ip: '0.0.0.0',
-                announcedIp: '192.168.1.245' // for LAN access
+                announcedIp: getLocalIp() // dynamically resolved for LAN access
             }
         ],
         enableUdp: true,

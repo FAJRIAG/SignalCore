@@ -13,11 +13,11 @@ interface RoomState {
   setAuth: (token: string, userId: number) => void;
   setRoom: (roomId: string, mediaToken: string, nodeId: string, roomCreatedAt: string) => void;
   setConnected: (status: boolean) => void;
-  addPeer: (userId: string, kind: string, track: any) => void;
-  removePeer: (userId: string) => void;
+  addPeer: (socketId: string, userId: string, kind: string, track: any) => void;
+  removePeer: (socketId: string) => void;
   clearPeers: () => void;
   clearRoom: () => void;
-  setPeerMediaState: (userId: string, kind: 'video' | 'audio', isMuted: boolean) => void;
+  setPeerMediaState: (socketId: string, kind: 'video' | 'audio', isMuted: boolean) => void;
   isWhiteboardOpen: boolean;
   setIsWhiteboardOpen: (isOpen: boolean) => void;
 }
@@ -45,21 +45,30 @@ export const useRoomStore = create<RoomState>((set) => ({
     set({ roomId, mediaToken, nodeId, roomCreatedAt });
   },
   setConnected: (status) => set({ connected: status }),
-  addPeer: (userId, kind, track) => set((state) => {
+  addPeer: (socketId, userId, kind, track) => set((state) => {
     const peers = { ...state.peers };
+    const existingPeer = peers[socketId] || { 
+        userId, 
+        video: null, 
+        audio: null, 
+        screen: null, 
+        videoMuted: false, 
+        audioMuted: false 
+    };
+    
     // Create a new object for the peer to ensure React detects the change
-    const peer = { ...(peers[userId] || { video: null, audio: null, screen: null, videoMuted: false, audioMuted: false }) };
+    const peer = { ...existingPeer };
     
     if (kind === 'video') peer.video = track;
     if (kind === 'audio') peer.audio = track;
     if (kind === 'screen') peer.screen = track;
     
-    peers[userId] = peer;
+    peers[socketId] = peer;
     return { peers };
   }),
-  removePeer: (userId) => set((state) => {
+  removePeer: (socketId) => set((state) => {
     const peers = { ...state.peers };
-    delete peers[userId];
+    delete peers[socketId];
     return { peers };
   }),
   clearPeers: () => set({ peers: {} }),
@@ -70,12 +79,13 @@ export const useRoomStore = create<RoomState>((set) => ({
     localStorage.removeItem('roomCreatedAt');
     set({ roomId: null, mediaToken: null, nodeId: null, roomCreatedAt: null, peers: {} });
   },
-  setPeerMediaState: (userId, kind, isMuted) => set((state) => {
+  setPeerMediaState: (socketId, kind, isMuted) => set((state) => {
     const peers = { ...state.peers };
-    const peer = peers[userId];
-    if (peer) {
+    if (peers[socketId]) {
+        const peer = { ...peers[socketId] };
         if (kind === 'video') peer.videoMuted = isMuted;
         if (kind === 'audio') peer.audioMuted = isMuted;
+        peers[socketId] = peer;
     }
     return { peers };
   }),

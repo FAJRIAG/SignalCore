@@ -8,6 +8,7 @@ import { Whiteboard } from '../components/Whiteboard';
 
 interface PendingProducer {
     producerId: string;
+    socketId: string;
     userId: string;
     kind: string;
 }
@@ -45,6 +46,8 @@ export default function Room() {
     const [localScreenTrack, setLocalScreenTrack] = useState<MediaStreamTrack | null>(null);
     const localScreenTrackRef = useRef<MediaStreamTrack | null>(null);
     const [copied, setCopied] = useState(false);
+    const [localSocketId, setLocalSocketId] = useState<string | null>(null);
+    const localSocketIdRef = useRef<string | null>(null);
     const [duration, setDuration] = useState('00:00');
     
     // Calculate start time based on room creation
@@ -89,8 +92,7 @@ export default function Room() {
         let isMounted = true; // guard against StrictMode double-mount
 
         console.info('[ROOM] Connecting to SFU...');
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
+        const ws = new WebSocket(`ws://${window.location.hostname}:3000`);
 
         wsRef.current = ws;
 
@@ -106,6 +108,8 @@ export default function Room() {
                 case 'auth_success': {
                     if (!isMounted) break;
                     console.info('[AUTH] Success!');
+                    setLocalSocketId(payload.socketId);
+                    localSocketIdRef.current = payload.socketId;
                     clearPeers(); // Clear stale peers before adding new ones
                     setConnected(true);
                     const device = new Device();
@@ -123,6 +127,7 @@ export default function Room() {
                             const source = p.appData?.source || 'camera';
                             pendingProducersRef.current.push({
                                 producerId: p.producerId,
+                                socketId: p.socketId,
                                 userId: p.userId,
                                 kind: source === 'screen' ? 'screen' : p.kind
                             });
@@ -195,26 +200,26 @@ export default function Room() {
                         console.info(`[ROOM] Draining ${pendingProducersRef.current.length} pending producers`);
                         while (pendingProducersRef.current.length > 0) {
                             const p = pendingProducersRef.current.shift()!;
-                            consume(p.producerId, p.userId, p.kind);
+                            consume(p.producerId, p.socketId, p.userId, p.kind);
                         }
                     }
                     break;
                 }
 
                 case 'newProducer': {
-                    const { producerId, userId: peerId, kind, appData } = payload;
+                    const { producerId, userId: peerUserId, socketId: peerSocketId, kind, appData } = payload;
                     const source = appData?.source || 'camera';
-                    console.info(`[ROOM] New producer available: ${kind} (${source}) from ${peerId}`);
+                    console.info(`[ROOM] New producer available: ${kind} (${source}) from ${peerUserId}`);
                     if (!recvTransportRef.current) {
-                        pendingProducersRef.current.push({ producerId, userId: peerId, kind: source === 'screen' ? 'screen' : kind });
+                        pendingProducersRef.current.push({ producerId, socketId: peerSocketId, userId: peerUserId, kind: source === 'screen' ? 'screen' : kind });
                     } else {
-                        consume(producerId, peerId, source === 'screen' ? 'screen' : kind);
+                        consume(producerId, peerSocketId, peerUserId, source === 'screen' ? 'screen' : kind);
                     }
                     break;
                 }
 
                 case 'consumed': {
-                    const { id, kind, rtpParameters, producerId, peerId, appData } = payload;
+                    const { id, kind, rtpParameters, producerId, peerId: peerSocketId, userId: peerUserId, appData } = payload;
                     const source = appData?.source || 'camera';
                     console.info(`[ROOM] Consumed ${kind} (${source}) from producer:${producerId}`);
                     const consumer = await recvTransportRef.current!.consume({
@@ -225,28 +230,28 @@ export default function Room() {
                     });
                     
                     ws.send(JSON.stringify({ type: 'resumeConsumer', payload: { consumerId: consumer.id } }));
-                    addPeer(peerId, source === 'screen' ? 'screen' : kind, consumer.track);
+                    addPeer(peerSocketId, peerUserId, source === 'screen' ? 'screen' : kind, consumer.track);
                     break;
                 }
 
                 case 'peerLeft': {
-                    const { userId: leftUserId } = payload;
-                    console.info(`[ROOM] Peer left signal received for: ${leftUserId}`);
-                    removePeer(String(leftUserId));
+                    const { socketId: leftSocketId } = payload;
+                    console.info(`[ROOM] Peer left signal received for: ${leftSocketId}`);
+                    removePeer(leftSocketId);
                     break;
                 }
 
                 case 'peerToggledMedia': {
-                    const { userId: toggleUserId, kind, isMuted } = payload;
-                    console.info(`[ROOM] Peer ${toggleUserId} toggled ${kind} to ${isMuted ? 'muted' : 'unmuted'}`);
-                    setPeerMediaState(String(toggleUserId), kind, isMuted);
+                    const { socketId: toggleSocketId, kind, isMuted } = payload;
+                    console.info(`[ROOM] Peer ${toggleSocketId} toggled ${kind} to ${isMuted ? 'muted' : 'unmuted'}`);
+                    setPeerMediaState(toggleSocketId, kind, isMuted);
                     break;
                 }
 
                 case 'producerClosed': {
-                    const { userId: closedUserId, kind } = payload;
-                    console.info(`[ROOM] Producer closed: ${kind} from ${closedUserId}`);
-                    addPeer(String(closedUserId), kind, null);
+                    const { socketId: closedSocketId, kind } = payload;
+                    console.info(`[ROOM] Producer closed: ${kind} from ${closedSocketId}`);
+                    addPeer(closedSocketId, '', kind, null); // userId placeholder as we have socketId
                     break;
                 }
 
@@ -282,8 +287,11 @@ export default function Room() {
                 // Set state so VideoGrid re-renders with local camera
                 setLocalVideoTrack(videoTrack ?? null);
 
-                addPeer(userId!.toString(), 'video', videoTrack);
-                addPeer(userId!.toString(), 'audio', audioTrack);
+                const currentSocketId = localSocketIdRef.current;
+                if (currentSocketId) {
+                    addPeer(currentSocketId, userId!.toString(), 'video', videoTrack);
+                    addPeer(currentSocketId, userId!.toString(), 'audio', audioTrack);
+                }
 
                 console.info('[MEDIA] Producing local video track...');
                 if (videoTrack) await transport.produce({ track: videoTrack, appData: { source: 'camera' } });
@@ -308,7 +316,7 @@ export default function Room() {
             }
         }
 
-        async function consume(producerId: string, peerId: string, _kind: string) {
+        async function consume(producerId: string, peerSocketId: string, peerUserId: string, _kind: string) {
             if (!wsRef.current || !recvTransportRef.current || !deviceRef.current) return;
             
             console.info(`[ROOM] Requesting to consume producer:${producerId}`);
@@ -317,7 +325,8 @@ export default function Room() {
                 payload: { 
                     transportId: recvTransportRef.current.id, 
                     producerId, 
-                    peerId,
+                    peerId: peerSocketId, // Passing socketId as peerId
+                    userId: peerUserId,
                     rtpCapabilities: deviceRef.current.rtpCapabilities 
                 } 
             }));
@@ -352,7 +361,10 @@ export default function Room() {
             localScreenTrackRef.current = track; // Track in ref for reliable cleanup
             setLocalScreenTrack(track);
             setScreenOn(true);
-            addPeer(userId!.toString(), 'screen', track);
+            const currentSocketId = localSocketIdRef.current;
+            if (currentSocketId) {
+                addPeer(currentSocketId, userId!.toString(), 'screen', track);
+            }
 
             const producer = await sendTransportRef.current.produce({ 
                 track, 
@@ -400,7 +412,10 @@ export default function Room() {
         setScreenOn(false);
 
         // 3. Update store
-        addPeer(userId!.toString(), 'screen', null);
+        const currentSocketId = localSocketIdRef.current;
+        if (currentSocketId) {
+            addPeer(currentSocketId, userId!.toString(), 'screen', null);
+        }
     }
 
     return (
@@ -436,7 +451,7 @@ export default function Room() {
                 <VideoGrid
                     localVideoTrack={localVideoTrack}
                     localScreenTrack={localScreenTrack}
-                    localUserId={userId?.toString()}
+                    localSocketId={localSocketId}
                     localMicOn={micOn}
                 />
 
